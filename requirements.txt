@@ -1,4 +1,4 @@
-# CijfersChat — Python backend dependencies
+# GeoKaart — Python backend dependencies
 # Install: pip install -r requirements.txt
 
 # ── Web framework ─────────────────────────────────────────────────────────────
@@ -22,6 +22,10 @@ duckdb>=1.1.0
 
 # ── Caching ───────────────────────────────────────────────────────────────────
 cachetools>=5.5.0
+
+# ── Agents & MCP ─────────────────────────────────────────────────────────────
+fastmcp>=3.4.0
+pydantic-ai>=1.0.0
 
 # ── Testing ───────────────────────────────────────────────────────────────────
 pytest>=8.0.0

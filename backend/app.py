@@ -7,8 +7,10 @@ GET  /catalog       → list of CBS geo-statistical tables
 POST /plan          → natural language → MapPlan (no data fetched)
 POST /map-data      → MapPlan → enriched GeoJSON
 POST /chat          → natural language → MapPlan + enriched GeoJSON + message
+*    /mcp           → MCP server (streamable-HTTP, all data tools)
 
 The /chat endpoint is the primary integration point for the frontend.
+The /mcp endpoint exposes all tools to any MCP-compatible client.
 """
 from __future__ import annotations
 
@@ -41,6 +43,7 @@ import spatial_service
 from spatial_service import get_geometries
 import duckdb_client
 import ingest as _ingest
+from geokaart_mcp.server import asgi_app as _mcp_asgi
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -102,6 +105,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── MCP server — mount at /mcp ────────────────────────────────────────────────
+# All GeoKaart data tools (CBS, PDOK) are accessible via MCP streamable-HTTP.
+# Claude Desktop config: {"url": "http://localhost:8000/mcp"}
+app.mount("/mcp", _mcp_asgi)
 
 
 # ── Request timing middleware ─────────────────────────────────────────────────
