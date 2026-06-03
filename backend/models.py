@@ -15,7 +15,14 @@ class MapPlan(BaseModel):
     The LLM fills this; backend services execute it.
     """
 
-    intent: Literal["map_choropleth", "zoom", "compare", "info", "explain"] = "map_choropleth"
+    intent: Literal[
+        "map_choropleth",    # standard CBS choropleth
+        "zoom",              # fly to a region
+        "compare",           # compare specific regions
+        "info",              # explain a region
+        "explain",           # explain the map / measure
+        "isochrone_stats",   # reachability polygon + CBS stats inside
+    ] = "map_choropleth"
     table_id: str = Field(..., description="CBS table ID, e.g. '86165NED'")
     measure_code: str = Field(..., description="CBS column name, e.g. 'AantalInwoners_5'")
     geography_level: Literal["gemeente", "wijk", "buurt"]
@@ -39,6 +46,20 @@ class MapPlan(BaseModel):
     classification: Literal["quantile", "equal", "jenks"] = "quantile"
     n_classes: int = Field(5, ge=3, le=9)
     message: str = Field(..., description="Short user-facing explanation in Dutch or English.")
+
+    # ── Isochrone fields (only used when intent = 'isochrone_stats') ──────────
+    iso_origin: str | None = Field(
+        None,
+        description="Starting point for isochrone: place name, address, or station. E.g. 'Rotterdam Centraal'.",
+    )
+    iso_minutes: list[int] | None = Field(
+        None,
+        description="Travel time threshold(s) in minutes. Single value = one ring, multiple = concentric bands. E.g. [10] or [5, 10, 20].",
+    )
+    iso_mode: Literal["foot-walking", "cycling-regular", "cycling-electric", "driving-car"] | None = Field(
+        None,
+        description="Travel mode for the isochrone. Default: foot-walking for stations/transit stops.",
+    )
 
     # ── Field validators ─────────────────────────────────────────────────────
 
@@ -215,9 +236,11 @@ class MapDataRequest(BaseModel):
 class ChatResponse(BaseModel):
     message: str
     plan: MapPlan
-    geojson: dict[str, Any]          # GeoJSON FeatureCollection
+    geojson: dict[str, Any]                    # GeoJSON FeatureCollection (choropleth)
+    isochrone: dict[str, Any] | None = None    # GeoJSON Feature (Polygon) for overlay
+    ring_summary: list[dict] | None = None     # multi-ring comparison table
     warnings: list[str] = Field(default_factory=list)
-    suggestions: list[str] = Field(default_factory=list)  # Related follow-up queries
+    suggestions: list[str] = Field(default_factory=list)
 
 
 class MapDataResponse(BaseModel):

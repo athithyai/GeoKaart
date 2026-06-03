@@ -135,6 +135,46 @@ export function MessageBubble({ message, isStreaming, onRetry }: Props) {
           </div>
         )}
 
+        {/* Ring summary table (isochrone multi-ring responses) */}
+        {!isStreaming && message.ring_summary && message.ring_summary.length > 0 && (
+          <div className="w-full mt-2 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
+            <div className="px-3 py-1.5 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+              <span className="text-[10px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">
+                Reachability bands
+              </span>
+            </div>
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900">
+                  <th className="px-3 py-1.5 text-left text-gray-500 font-semibold">Ring</th>
+                  <th className="px-3 py-1.5 text-right text-gray-500 font-semibold">Avg</th>
+                  <th className="px-3 py-1.5 text-right text-gray-500 font-semibold">Max</th>
+                  <th className="px-3 py-1.5 text-right text-gray-500 font-semibold">Areas</th>
+                </tr>
+              </thead>
+              <tbody>
+                {message.ring_summary.map((r, i) => (
+                  <tr key={i} className={i % 2 === 0 ? 'bg-white dark:bg-gray-800' : 'bg-gray-50 dark:bg-gray-850'}>
+                    <td className="px-3 py-1.5 text-gray-700 dark:text-gray-300 font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: '#00A1CD', opacity: 0.4 + i * 0.2 }} />
+                        {r.minutes} min
+                      </span>
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-gray-700 dark:text-gray-300">
+                      {r.avg_value != null ? r.avg_value.toLocaleString() : '—'}
+                    </td>
+                    <td className="px-3 py-1.5 text-right font-mono text-gray-700 dark:text-gray-300">
+                      {r.max_value != null ? r.max_value.toLocaleString() : '—'}
+                    </td>
+                    <td className="px-3 py-1.5 text-right text-gray-400">{r.n_regions}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
         {/* Plan card (assistant only) */}
         {!isStreaming && message.plan && (
           <div className="w-full mt-1">

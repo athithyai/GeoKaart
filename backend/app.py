@@ -43,7 +43,15 @@ import spatial_service
 from spatial_service import get_geometries
 import duckdb_client
 import ingest as _ingest
-from geokaart_mcp.server import asgi_app as _mcp_asgi
+import routing_client
+import isochrone_fusion
+
+try:
+    from geokaart_mcp.server import asgi_app as _mcp_asgi
+    _HAS_MCP = True
+except ImportError:
+    _mcp_asgi = None
+    _HAS_MCP = False
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -109,7 +117,8 @@ app.add_middleware(
 # ── MCP server — mount at /mcp ────────────────────────────────────────────────
 # All GeoKaart data tools (CBS, PDOK) are accessible via MCP streamable-HTTP.
 # Claude Desktop config: {"url": "http://localhost:8000/mcp"}
-app.mount("/mcp", _mcp_asgi)
+if _HAS_MCP and _mcp_asgi is not None:
+    app.mount("/mcp", _mcp_asgi)
 
 
 # ── Request timing middleware ─────────────────────────────────────────────────
@@ -830,6 +839,134 @@ async def chat_endpoint(body: ChatRequest):
             plan=plan,
             geojson={"type": "FeatureCollection", "features": []},
             warnings=[],
+        )
+
+    # ── Isochrone stats: geocode origin → ORS isochrone → CBS join ───────────────
+    if plan.intent == "isochrone_stats":
+        warnings: list[str] = []
+
+        if not plan.iso_origin:
+            return ChatResponse(
+                message="I need a starting point for the isochrone. Please specify a place, e.g. 'Rotterdam Centraal'.",
+                plan=plan,
+                geojson={"type": "FeatureCollection", "features": []},
+                warnings=["No iso_origin specified."],
+            )
+
+        ring_minutes = plan.iso_minutes or [10]
+        mode = plan.iso_mode or "foot-walking"
+
+        # Step 1: geocode the origin
+        from geocoder import geocode as _geocode
+        geo_results = await _geocode(plan.iso_origin, n_results=1)
+        if not geo_results or "error" in geo_results[0] or geo_results[0].get("lat") is None:
+            return ChatResponse(
+                message=f"Could not geocode '{plan.iso_origin}'. Please check the place name.",
+                plan=plan,
+                geojson={"type": "FeatureCollection", "features": []},
+                warnings=[f"Geocoding failed for '{plan.iso_origin}'."],
+            )
+
+        origin = geo_results[0]
+        origin_lon, origin_lat = origin["lon"], origin["lat"]
+        logger.info("Isochrone origin: %s → (%.4f, %.4f)", plan.iso_origin, origin_lon, origin_lat)
+
+        # Step 2: fetch isochrone(s) from ORS
+        try:
+            if len(ring_minutes) == 1:
+                iso_feature = await routing_client.get_isochrone(
+                    origin_lon, origin_lat, ring_minutes[0], mode
+                )
+                ring_features = [iso_feature]
+            else:
+                ring_features = await routing_client.get_multi_ring_isochrones(
+                    origin_lon, origin_lat, ring_minutes, mode
+                )
+                iso_feature = ring_features[-1]  # outermost ring for overlay
+        except Exception as exc:
+            logger.warning("ORS isochrone failed: %s", exc)
+            warnings.append(f"Routing service unavailable: {exc}")
+            return ChatResponse(
+                message=f"Could not compute isochrone from '{plan.iso_origin}'. The routing service may be unavailable or rate-limited. Try again shortly.",
+                plan=plan,
+                geojson={"type": "FeatureCollection", "features": []},
+                warnings=warnings,
+            )
+
+        # Step 3: fetch CBS stats for the region
+        from cbs_client import get_observations as _get_obs
+        import duckdb_client as _ddb
+        df = _ddb.get_observations_local(
+            plan.table_id, plan.measure_code, plan.geography_level, plan.region_scope
+        )
+        if df is None or df.empty:
+            try:
+                df = await _get_obs(
+                    plan.table_id, plan.measure_code, plan.geography_level, plan.region_scope, None
+                )
+            except Exception as exc:
+                warnings.append(f"CBS data fetch failed: {exc}")
+                df = None
+
+        if df is None or df.empty:
+            warnings.append(f"No CBS data available for {plan.measure_code}.")
+            enriched = {"type": "FeatureCollection", "features": [], "meta": {}}
+            ring_summary = None
+        else:
+            # Step 4: fuse isochrone × CBS stats
+            try:
+                if len(ring_features) == 1:
+                    enriched = await isochrone_fusion.fuse_isochrone_stats(
+                        iso_feature, df, plan.geography_level, plan.measure_code,
+                        plan.n_classes, plan.classification
+                    )
+                    ring_summary = None
+                else:
+                    enriched = await isochrone_fusion.fuse_multi_ring_stats(
+                        ring_features, df, plan.geography_level, plan.measure_code
+                    )
+                    ring_summary = enriched.pop("ring_summary", None)
+            except Exception as exc:
+                logger.exception("Fusion failed: %s", exc)
+                warnings.append(f"Spatial fusion failed: {exc}")
+                enriched = {"type": "FeatureCollection", "features": [], "meta": {}}
+                ring_summary = None
+
+        # Step 5: narrate
+        meta = enriched.get("meta")
+        n_matched = meta.get("n_matched", 0) if meta else 0
+        top_regions = sorted(
+            [f["properties"] for f in enriched.get("features", []) if f["properties"].get("value") is not None],
+            key=lambda p: p["value"], reverse=True
+        )[:5]
+
+        mode_label = {"foot-walking": "walking", "cycling-regular": "cycling",
+                      "cycling-electric": "e-bike", "driving-car": "driving"}.get(mode, mode)
+        ring_str = " / ".join(f"{m} min" for m in ring_minutes)
+        measure_label = plan.measure_code.replace("_", " ").replace(
+            next((k for k in ("Gemiddeld", "Aantal", "Personen") if k in plan.measure_code), ""), ""
+        ).strip()
+
+        reply = await generate_narration(
+            user_message=body.message,
+            plan=plan,
+            meta=meta,
+            history=body.history,
+            measure_label=measure_label,
+            top_regions=top_regions or None,
+        )
+
+        if n_matched == 0:
+            reply = f"The {ring_str} {mode_label} isochrone from {plan.iso_origin} was computed, but no CBS data matched the regions inside. {reply}"
+
+        return ChatResponse(
+            message=reply,
+            plan=plan,
+            geojson=enriched,
+            isochrone=iso_feature,
+            ring_summary=ring_summary,
+            warnings=warnings,
+            suggestions=_make_suggestions(plan),
         )
 
     # ── Map choropleth: validate measure, fetch CBS + PDOK + join, narrate ──────

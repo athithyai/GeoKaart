@@ -4,7 +4,7 @@
 
 export type GeographyLevel = 'gemeente' | 'wijk' | 'buurt'
 export type Classification  = 'quantile' | 'jenks' | 'equal'
-export type Intent          = 'map_choropleth' | 'zoom' | 'compare' | 'info' | 'explain'
+export type Intent = 'map_choropleth' | 'zoom' | 'compare' | 'info' | 'explain' | 'isochrone_stats'
 
 export interface MapPlan {
   intent: Intent
@@ -17,6 +17,10 @@ export interface MapPlan {
   classification: Classification
   n_classes: number
   message: string
+  // isochrone fields
+  iso_origin?: string | null
+  iso_minutes?: number[] | null
+  iso_mode?: string | null
 }
 
 // ── GeoJSON meta ──────────────────────────────────────────────────────────────
@@ -56,8 +60,18 @@ export interface ChatResponse {
   message: string
   plan: MapPlan
   geojson: ChoroplethFeatureCollection
+  isochrone?: GeoJSON.Feature | null
+  ring_summary?: RingSummary[] | null
   warnings: string[]
   suggestions: string[]
+}
+
+export interface RingSummary {
+  minutes: number
+  n_regions: number
+  avg_value: number | null
+  max_value: number | null
+  min_value: number | null
 }
 
 // ── Chat store ────────────────────────────────────────────────────────────────
@@ -79,6 +93,8 @@ export interface Message {
   chartData?: ChartDataPoint[]
   warnings?: string[]
   suggestions?: string[]
+  isochrone?: GeoJSON.Feature | null
+  ring_summary?: RingSummary[] | null
   timestamp: number
 }
 
@@ -99,9 +115,10 @@ export interface ChatState {
   messages: Message[]
   currentPlan: MapPlan | null
   currentGeoJSON: ChoroplethFeatureCollection | null
+  currentIsochrone: GeoJSON.Feature | null
   selectedRegion: SelectedRegion | null
-  isLoading: boolean       // chat request in flight
-  isLayerLoading: boolean  // layer switch in flight (map stays interactive during chat)
+  isLoading: boolean
+  isLayerLoading: boolean
   flyToStatcode: string | null
   setFlyTo: (code: string | null) => void
   error: string | null

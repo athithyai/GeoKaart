@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     CBS_CATALOG_URL: str = "https://opendata.cbs.nl/ODataCatalog/Tables?$format=json"
     PDOK_OGC_BASE: str = "https://api.pdok.nl/cbs/gebiedsindelingen/ogc/v1"
 
+    # ── Routing (OpenRouteService) ────────────────────────────────────────────
+    # Free API key at https://openrouteservice.org/dev/#/signup
+    # Leave empty to use the public demo endpoint (rate-limited, for dev only)
+    ORS_API_KEY: str = ""
+    ORS_BASE_URL: str = "https://api.openrouteservice.org"
+
     # ── Cache TTLs (seconds) ─────────────────────────────────────────────────
     CACHE_TTL_METADATA: int = 3600        # 1 h  — CBS catalog & DataProperties
     CACHE_TTL_GEOMETRY: int = 86400       # 24 h — PDOK geometries

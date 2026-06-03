@@ -47,6 +47,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messages: [],
   currentPlan: null,
   currentGeoJSON: null,
+  currentIsochrone: null,
   selectedRegion: null,
   isLoading: false,
   isLayerLoading: false,
@@ -135,6 +136,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chartData,
         warnings: response.warnings,
         suggestions: response.suggestions,
+        isochrone: response.isochrone ?? null,
+        ring_summary: response.ring_summary ?? null,
         timestamp: Date.now(),
       }
 
@@ -143,10 +146,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
       set({
         messages: [...get().messages, assistantMsg],
         currentPlan: response.plan,
-        // Only update the map if the response contains actual geometry
         ...(hasFeatures
           ? { currentGeoJSON: response.geojson as ChoroplethFeatureCollection }
           : {}),
+        currentIsochrone: response.isochrone ?? null,
         isLoading: false,
       })
     } catch (err) {
@@ -271,6 +274,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messages: [],
       currentPlan: null,
       currentGeoJSON: null,
+      currentIsochrone: null,
       selectedRegion: null,
       error: null,
     }),

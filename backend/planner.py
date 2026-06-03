@@ -117,7 +117,10 @@ Output ONLY a single valid JSON object — no markdown, no code fences, no comme
   "period": null,
   "classification": "quantile",
   "n_classes": 5,
-  "message": "<short user-facing explanation in the same language as the user>"
+  "message": "<short user-facing explanation in the same language as the user>",
+  "iso_origin": null,
+  "iso_minutes": null,
+  "iso_mode": null
 }}
 
 === KEYWORD → MEASURE CODE CHEAT SHEET ===
@@ -277,6 +280,72 @@ Examples:
   → region_scope: null   ← IGNORE selected region, this is a national map
 
 KEY: "surrounding" / "omgeving" / "omliggend" → ALWAYS use buffer_scope, NEVER region_scope.
+
+=== ISOCHRONE STATS INTENT ===
+Use intent = "isochrone_stats" when the user asks about reaching a place within a travel time,
+or about statistics for people/areas reachable from a point.
+
+Trigger phrases:
+  "within X minutes from Y"         "binnen X minuten van Y"
+  "reachable in X minutes"          "bereikbaar in X minuten"
+  "from [station/place] in X min"   "vanuit [station] in X minuten"
+  "X min walk/bike/drive from Y"    "wie woont er binnen X min lopen"
+  "what can I reach in X minutes"   "hoever kom ik in X minuten"
+  "high income within X min"        "income near [place]"
+
+Rules:
+  - iso_origin: the starting point. Extract the EXACT name as spoken. Examples:
+      "Rotterdam Centraal", "Amsterdam Centraal station", "Utrecht CS"
+  - iso_minutes: list of integers. Single time = [N]. Multiple rings = [5, 10, 20].
+    If not specified, default to [10] for walking queries.
+  - iso_mode: infer from context:
+      "lopen" / "walk" / "foot" / near a station → "foot-walking"
+      "fietsen" / "bike" / "cycling"              → "cycling-regular"
+      "rijden" / "drive" / "car" / "auto"         → "driving-car"
+    Default: "foot-walking"
+  - table_id + measure_code: use normal CBS cheat sheet rules (income, WOZ, etc.)
+  - geography_level: prefer "wijk" for station proximity queries (finer granularity)
+  - region_scope: set to the GM#### of the city the origin is in (e.g. Rotterdam = "GM0599")
+    This pre-filters geometry to load only that city's wijken — faster.
+  - iso_minutes must ALWAYS be a JSON array, even for a single value: [10] not 10.
+
+Example — "Where do high income people live within 10 min walk from Rotterdam Centraal?":
+{{
+  "intent": "isochrone_stats",
+  "table_id": "85984NED",
+  "measure_code": "GemiddeldInkomenPerInwoner_78",
+  "geography_level": "wijk",
+  "region_scope": "GM0599",
+  "province_scope": null,
+  "buffer_scope": null,
+  "buffer_km": 15,
+  "period": null,
+  "classification": "quantile",
+  "n_classes": 5,
+  "message": "Income distribution within 10 min walk of Rotterdam Centraal.",
+  "iso_origin": "Rotterdam Centraal",
+  "iso_minutes": [10],
+  "iso_mode": "foot-walking"
+}}
+
+Example — "Compare house values at 5, 10, 20 min cycling from Amsterdam Centraal":
+{{
+  "intent": "isochrone_stats",
+  "table_id": "86165NED",
+  "measure_code": "GemiddeldeWOZWaardeVanWoningen_39",
+  "geography_level": "wijk",
+  "region_scope": "GM0363",
+  "province_scope": null,
+  "buffer_scope": null,
+  "buffer_km": 15,
+  "period": null,
+  "classification": "quantile",
+  "n_classes": 5,
+  "message": "House values at 5, 10 and 20 min cycling rings from Amsterdam Centraal.",
+  "iso_origin": "Amsterdam Centraal",
+  "iso_minutes": [5, 10, 20],
+  "iso_mode": "cycling-regular"
+}}
 
 === EXPLAIN INTENT ===
 Use intent = "explain" when the user asks to INTERPRET or UNDERSTAND the current map —

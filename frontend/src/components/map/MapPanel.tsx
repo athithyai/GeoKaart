@@ -6,6 +6,7 @@ import { MapLegend } from './MapLegend'
 import { MapTooltip } from './MapTooltip'
 import { MapControls } from './MapControls'
 import { MapSearch } from './MapSearch'
+import { useIsochroneLayer } from './IsochroneLayer'
 import type { ChoroplethFeatureProperties, ChoroplethMeta } from '../../types'
 
 const NL_CENTER: [number, number] = [5.2913, 52.1326]
@@ -41,6 +42,9 @@ export function MapPanel() {
   const selectRegion    = useChatStore(s => s.selectRegion)
   const flyToStatcode   = useChatStore(s => s.flyToStatcode)
   const setFlyTo        = useChatStore(s => s.setFlyTo)
+
+  // ── Isochrone layer ─────────────────────────────────────────────────────────
+  useIsochroneLayer({ map: mapRef.current! })
 
   // ── Init map ────────────────────────────────────────────────────────────────
   useEffect(() => {
