@@ -1,6 +1,5 @@
 /** Collapsible JSON plan viewer with syntax highlighting. */
 import type { MapPlan } from '../../types'
-import { useLangStore } from '../../store/langStore'
 
 function highlightJson(json: string): string {
   return json
@@ -16,7 +15,6 @@ interface Props {
 }
 
 export function PlanCard({ plan }: Props) {
-  const { t } = useLangStore()
   const json = JSON.stringify(plan, null, 2)
   const highlighted = highlightJson(json)
 
@@ -33,7 +31,7 @@ export function PlanCard({ plan }: Props) {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="font-medium">{t.executionPlan}</span>
+        <span className="font-medium">Execution plan</span>
         <span className="opacity-60">· {plan.table_id} / {plan.geography_level}</span>
       </summary>
 
@@ -46,7 +44,7 @@ export function PlanCard({ plan }: Props) {
             className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200
                        transition-colors"
           >
-            {t.copy}
+            Copy
           </button>
         </div>
         <pre

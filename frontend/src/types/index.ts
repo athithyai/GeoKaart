@@ -50,7 +50,6 @@ export interface ChoroplethFeatureCollection extends GeoJSON.FeatureCollection {
 export interface ChatRequest {
   message: string
   history: Array<{ role: 'user' | 'assistant'; content: string }>
-  lang?: 'en' | 'nl'
 }
 
 export interface ChatResponse {

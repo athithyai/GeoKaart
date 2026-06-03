@@ -1,13 +1,11 @@
 import { useRef, useState, KeyboardEvent } from 'react'
 import { useChatStore } from '../../store/chatStore'
-import { useLangStore } from '../../store/langStore'
 
 export function InputBar() {
   const [value, setValue] = useState('')
   const sendMessage = useChatStore(s => s.sendMessage)
   const isLoading = useChatStore(s => s.isLoading)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
-  const { t } = useLangStore()
 
   const canSend = value.trim().length > 0 && !isLoading
 
@@ -47,7 +45,7 @@ export function InputBar() {
           onChange={e => setValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onInput={handleInput}
-          placeholder={t.inputPlaceholder}
+          placeholder="Ask about any place in the Netherlands…"
           rows={1}
           disabled={isLoading}
           className="flex-1 resize-none bg-transparent text-sm text-gray-900 dark:text-gray-100
@@ -70,7 +68,7 @@ export function InputBar() {
         </button>
       </div>
       <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1.5 px-1">
-        {t.inputHint}
+        Enter to send · Shift+Enter for new line
       </p>
     </div>
   )

@@ -2,7 +2,6 @@
 
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
-import { useLangStore } from './langStore'
 import type {
   ChartDataPoint,
   ChatState,
@@ -82,10 +81,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       timestamp: Date.now(),
     }
 
+    const _GREETING_REPLIES = [
+      'Hello! Ask me about any place in the Netherlands — statistics, routing, or proximity. Try: "Population density per municipality" or "House values in Amsterdam."',
+      'Hi! I map Dutch open data on demand. What would you like to explore?',
+      'Hey! Ask anything about places in the Netherlands.',
+    ]
+    const _CASUAL_REPLIES = [
+      'Ha! Ask me something about the Netherlands — e.g. "Gas consumption per municipality" or "Income in Amsterdam."',
+      '😄 Ready when you are. Try: "House values per municipality in Utrecht".',
+    ]
+
     // Fast-path: greeting or casual reaction → instant reply, no LLM call needed
     if (_isGreeting(text) || _isCasual(text)) {
-      const { t } = useLangStore.getState()
-      const replyPool = _isGreeting(text) ? t.greetingReplies : t.casualReplies
+      const replyPool = _isGreeting(text) ? _GREETING_REPLIES : _CASUAL_REPLIES
       const greetMsg: Message = {
         id: uid(),
         role: 'assistant',
@@ -99,8 +107,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ messages: [...messages, userMsg], isLoading: true, error: null })
 
     try {
-      const { lang } = useLangStore.getState()
-      const response = await api.chat({ message: contextualText, history, lang })
+      const response = await api.chat({ message: contextualText, history })
 
       // Build chart data from top-10 regions by value (choropleth only)
       let chartData: ChartDataPoint[] | undefined
@@ -168,8 +175,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectRegion: (region: SelectedRegion | null) => {
     if (region) {
       const name = region.statnaam
-      const { t } = useLangStore.getState()
-      const suggestions = t.regionSuggestions(name)
+      const suggestions = [
+        `What is the population density in ${name}?`,
+        `House values in ${name}`,
+        `Average income per resident in ${name}`,
+        `Compare ${name} with surrounding municipalities`,
+      ]
       const sysMsg: Message = {
         id: uid(),
         role: 'system',

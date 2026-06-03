@@ -199,7 +199,6 @@ class MapPlan(BaseModel):
 class ChatRequest(BaseModel):
     message: str = Field(..., min_length=1, max_length=2000)
     history: list[dict[str, str]] = Field(default_factory=list)
-    lang: Literal["en", "nl"] | None = Field(None, description="UI language preference — overrides auto-detection")
 
 
 class PlanRequest(BaseModel):
