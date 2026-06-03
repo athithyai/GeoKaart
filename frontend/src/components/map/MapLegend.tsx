@@ -1,6 +1,7 @@
 /** Choropleth color legend. */
 
 import type { ChoroplethMeta } from '../../types'
+import { useLangStore } from '../../store/langStore'
 
 interface Props {
   meta: ChoroplethMeta
@@ -17,6 +18,7 @@ function formatBreak(v: number): string {
 export function MapLegend({ meta, measureCode }: Props) {
   const { breaks, colors, null_color, n_matched, n_total } = meta
   const n = colors.length
+  const { t } = useLangStore()
 
   return (
     <div className="absolute bottom-8 right-4 z-10 bg-white/95 dark:bg-gray-900/95
@@ -49,13 +51,13 @@ export function MapLegend({ meta, measureCode }: Props) {
         {/* No data */}
         <div className="flex items-center gap-2 mt-0.5 pt-0.5 border-t border-gray-100 dark:border-gray-800">
           <div className="w-4 h-3 rounded-sm shrink-0" style={{ backgroundColor: null_color }} />
-          <span className="text-[11px] text-gray-400 dark:text-gray-500">No data</span>
+          <span className="text-[11px] text-gray-400 dark:text-gray-500">{t.noData}</span>
         </div>
       </div>
 
       {/* Match stats */}
       <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-2">
-        {n_matched} / {n_total} regions
+        {n_matched} / {n_total} {t.regions}
       </p>
     </div>
   )

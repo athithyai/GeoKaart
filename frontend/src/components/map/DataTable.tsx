@@ -1,6 +1,7 @@
 /** Collapsible data table panel — shows sorted regions with CBS values. */
 import { useState } from 'react'
 import { useChatStore } from '../../store/chatStore'
+import { useLangStore } from '../../store/langStore'
 
 export function DataTable() {
   const [open, setOpen] = useState(false)
@@ -11,6 +12,7 @@ export function DataTable() {
   const selectRegion   = useChatStore(s => s.selectRegion)
 
   const meta = currentGeoJSON?.meta
+  const { t } = useLangStore()
   if (!meta) return null   // boundary-only mode — no values to show
 
   const rows = (currentGeoJSON?.features ?? [])
@@ -44,7 +46,7 @@ export function DataTable() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M3 10h18M3 14h18M10 3v18" />
           </svg>
-          Datatabel — {rows.length} regio's{noData > 0 ? ` (${noData} geen data)` : ''}{period}
+          {t.dataTable} — {rows.length} {t.regions}{noData > 0 ? ` (${noData} ${t.noDataSuffix})` : ''}{period}
         </span>
         <svg
           className={`w-4 h-4 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
@@ -62,10 +64,10 @@ export function DataTable() {
             <tr className="border-b border-gray-200 dark:border-gray-700">
               <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-semibold w-8">#</th>
               <th className="px-3 py-2 text-left text-gray-500 dark:text-gray-400 font-semibold">
-                Regio
+                {t.regionCol}
               </th>
               <th className="px-3 py-2 text-right text-gray-500 dark:text-gray-400 font-semibold">
-                {currentPlan?.measure_code?.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').trim() ?? 'Waarde'}
+                {currentPlan?.measure_code?.replace(/_\d+$/, '').replace(/([A-Z])/g, ' $1').trim() ?? t.valueCol}
               </th>
             </tr>
           </thead>

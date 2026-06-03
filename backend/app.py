@@ -739,7 +739,7 @@ async def chat_endpoint(body: ChatRequest):
 
     # Step 2: Plan — catch failures gracefully (never return a 422 for chat)
     try:
-        plan = await generate_plan(body.message, body.history, cat, context=context)
+        plan = await generate_plan(body.message, body.history, cat, context=context, lang=body.lang)
     except ValueError as exc:
         logger.warning("Planning failed: %s", exc)
         fallback_plan = MapPlan(
@@ -816,6 +816,7 @@ async def chat_endpoint(body: ChatRequest):
             history=body.history,
             measure_label=measure_label,
             top_regions=None,
+            lang=body.lang,
         )
         return ChatResponse(
             message=reply,
@@ -911,6 +912,7 @@ async def chat_endpoint(body: ChatRequest):
         measure_label=measure_label,
         top_regions=top_regions or None,
         center_value=center_value if plan.buffer_scope else None,
+        lang=body.lang,
     )
 
     return ChatResponse(

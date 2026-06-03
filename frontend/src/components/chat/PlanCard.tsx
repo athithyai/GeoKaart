@@ -1,5 +1,6 @@
 /** Collapsible JSON plan viewer with syntax highlighting. */
 import type { MapPlan } from '../../types'
+import { useLangStore } from '../../store/langStore'
 
 function highlightJson(json: string): string {
   return json
@@ -15,6 +16,7 @@ interface Props {
 }
 
 export function PlanCard({ plan }: Props) {
+  const { t } = useLangStore()
   const json = JSON.stringify(plan, null, 2)
   const highlighted = highlightJson(json)
 
@@ -31,20 +33,20 @@ export function PlanCard({ plan }: Props) {
         >
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
         </svg>
-        <span className="font-medium">Execution plan</span>
+        <span className="font-medium">{t.executionPlan}</span>
         <span className="opacity-60">· {plan.table_id} / {plan.geography_level}</span>
       </summary>
 
       <div className="mt-2 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700">
         <div className="flex items-center justify-between px-3 py-1.5 bg-gray-100 dark:bg-gray-800
                         border-b border-gray-200 dark:border-gray-700">
-          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">JSON Plan</span>
+          <span className="text-xs font-medium text-gray-500 dark:text-gray-400">JSON</span>
           <button
             onClick={() => navigator.clipboard.writeText(json)}
             className="text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-200
                        transition-colors"
           >
-            Copy
+            {t.copy}
           </button>
         </div>
         <pre

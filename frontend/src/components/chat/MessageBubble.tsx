@@ -4,6 +4,7 @@ import { MiniBarChart } from './MiniBarChart'
 import type { Message } from '../../types'
 import { LoadingDots } from './LoadingDots'
 import { useChatStore } from '../../store/chatStore'
+import { useLangStore } from '../../store/langStore'
 import { LogoIcon } from '../LogoIcon'
 
 interface Props {
@@ -29,6 +30,7 @@ function formatTime(ts: number) {
 
 export function MessageBubble({ message, isStreaming, onRetry }: Props) {
   const sendMessage = useChatStore(s => s.sendMessage)
+  const { t } = useLangStore()
   const isUser   = message.role === 'user'
   const isError  = message.role === 'error'
   const isSystem = message.role === 'system'
@@ -111,7 +113,7 @@ export function MessageBubble({ message, isStreaming, onRetry }: Props) {
                              text-red-700 dark:text-red-300 border border-red-200 dark:border-red-700
                              transition-colors"
                 >
-                  ↺ Try again
+                  {t.retry}
                 </button>
               )}
             </div>
@@ -158,7 +160,7 @@ export function MessageBubble({ message, isStreaming, onRetry }: Props) {
         {!isStreaming && message.suggestions && message.suggestions.length > 0 && (
           <div className="mt-2 w-full">
             <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider mb-1.5 px-0.5">
-              Gerelateerde data
+              {t.relatedData}
             </p>
             <div className="flex flex-wrap gap-1.5">
               {message.suggestions.map((s, i) => (

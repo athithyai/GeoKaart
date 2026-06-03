@@ -1,12 +1,8 @@
 /** Layer-level toggle buttons + selected region badge. */
 
 import { useChatStore } from '../../store/chatStore'
+import { useLangStore } from '../../store/langStore'
 import type { GeographyLevel } from '../../types'
-
-const LEVELS: { value: GeographyLevel; label: string; sublabel: string }[] = [
-  { value: 'gemeente', label: 'Gemeente', sublabel: 'municipalities' },
-  // wijk + buurt kept for future use — not exposed in UI yet
-]
 
 export function MapControls() {
   const currentPlan    = useChatStore(s => s.currentPlan)
@@ -14,6 +10,12 @@ export function MapControls() {
   const isLayerLoading = useChatStore(s => s.isLayerLoading)
   const switchLayer    = useChatStore(s => s.switchLayer)
   const selectRegion   = useChatStore(s => s.selectRegion)
+  const { t } = useLangStore()
+
+  const LEVELS: { value: GeographyLevel; label: string; sublabel: string }[] = [
+    { value: 'gemeente', label: 'Gemeente', sublabel: t.municipalities },
+    // wijk + buurt kept for future use — not exposed in UI yet
+  ]
 
   const activeLevel = currentPlan?.geography_level ?? null
 
@@ -26,7 +28,7 @@ export function MapControls() {
         <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-800">
           <span className="font-display text-[10px] font-medium uppercase tracking-wider"
                 style={{ color: '#878787' }}>
-            Geography layer
+            {t.geoLayer}
           </span>
         </div>
 
@@ -83,7 +85,7 @@ export function MapControls() {
           <div className="flex-1 min-w-0">
             <p className="font-display text-[10px] font-medium uppercase tracking-wider mb-0.5"
                style={{ color: '#0580A1' }}>
-              Selected
+              {t.selected}
             </p>
             <p className="text-xs font-medium text-gray-800 dark:text-gray-200 truncate">
               {selectedRegion.statnaam}
@@ -96,7 +98,7 @@ export function MapControls() {
             onClick={() => selectRegion(null)}
             className="shrink-0 mt-0.5 text-gray-400 hover:text-gray-600
                        dark:hover:text-gray-200 transition-colors"
-            title="Deselect region"
+            title={t.deselectRegion}
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5}

@@ -666,6 +666,7 @@ async def generate_plan(
     history: list[dict[str, str]],
     catalog: CatalogIndex,
     context: dict | None = None,
+    lang: str | None = None,
 ) -> MapPlan:
     """Parse a natural-language message into a validated MapPlan.
 
@@ -744,6 +745,7 @@ async def generate_narration(
     measure_label: str,
     top_regions: list[dict] | None = None,
     center_value: float | None = None,
+    lang: str | None = None,
 ) -> str:
     """Generate a rich conversational reply after data has been fetched.
 
@@ -786,13 +788,18 @@ async def generate_narration(
     }
     measure_unit = _MEASURE_UNITS.get(plan.measure_code, "")
 
-    # Language detection: use Dutch if any Dutch signal words are present
-    dutch_signals = {
-        "nederland", "dutch", "nl", "gemeente", "wat", "toon",
-        "laat", "gemiddeld", "per", "toon", "bereik", "vergelijk", "leg", "uit",
-        "waarom", "welke", "hoeveel", "veel", "weinig", "hoog", "laag",
-    }
-    lang = "Dutch" if any(w in user_message.lower().split() for w in dutch_signals) else "English"
+    # Resolve language: explicit UI preference > heuristic word-match
+    if lang and lang.lower() in ("nl", "dutch"):
+        lang = "Dutch"
+    elif lang and lang.lower() in ("en", "english"):
+        lang = "English"
+    else:
+        dutch_signals = {
+            "nederland", "dutch", "nl", "gemeente", "wat", "toon",
+            "laat", "gemiddeld", "per", "bereik", "vergelijk", "leg", "uit",
+            "waarom", "welke", "hoeveel", "veel", "weinig", "hoog", "laag",
+        }
+        lang = "Dutch" if any(w in user_message.lower().split() for w in dutch_signals) else "English"
 
     # Build a compact data summary — kept under 200 tokens
     data_lines: list[str] = []

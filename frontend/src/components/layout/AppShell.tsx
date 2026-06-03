@@ -3,8 +3,10 @@ import { ChatPanel } from '../chat/ChatPanel'
 import { MapPanel } from '../map/MapPanel'
 import { DataTable } from '../map/DataTable'
 import { ThemeToggle } from './ThemeToggle'
+import { LangToggle } from './LangToggle'
 import { LogoWordmark } from '../LogoIcon'
 import { api } from '../../api/client'
+import { useLangStore } from '../../store/langStore'
 
 const MIN_CHAT_WIDTH = 300
 const MAX_CHAT_WIDTH = 640
@@ -30,6 +32,7 @@ export function AppShell() {
   const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH)
   const [dragging, setDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
+  const { t } = useLangStore()
 
   // Ingest / refresh state
   const [ingestStatus, setIngestStatus] = useState<IngestStatus>('idle')
@@ -105,7 +108,7 @@ export function AppShell() {
         <div className="flex items-center gap-3">
           <LogoWordmark iconSize={28} />
           <span className="text-xs hidden sm:block" style={{ color: '#878787' }}>
-            Dutch Regional Statistics
+            {t.subtitle}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -116,8 +119,8 @@ export function AppShell() {
               disabled={ingestStatus === 'running'}
               title={
                 ingestStatus === 'running'
-                  ? `Vernieuwen: ${ingestProgress}`
-                  : `Ruimtelijke data vernieuwen${ingestLastRun ? ` · bijgewerkt ${_fmtDate(ingestLastRun)}` : ''}`
+                  ? `${t.refreshRunning} ${ingestProgress}`
+                  : `${t.refreshIdle}${ingestLastRun ? ` · ${t.refreshLastUpdated.replace('{date}', _fmtDate(ingestLastRun))}` : ''}`
               }
               className={[
                 'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
@@ -135,17 +138,18 @@ export function AppShell() {
               >↻</span>
               <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 max-w-0 group-hover:max-w-[160px] overflow-hidden whitespace-nowrap">
                 {ingestStatus === 'running'
-                  ? (ingestProgress || 'Vernieuwen …')
+                  ? (ingestProgress || t.refreshRunning)
                   : ingestLastRun
-                  ? `bijgewerkt ${_fmtDate(ingestLastRun)}`
-                  : 'data vernieuwen'}
+                  ? t.refreshLastUpdated.replace('{date}', _fmtDate(ingestLastRun))
+                  : t.refreshData}
               </span>
             </button>
           </div>
 
           <span className="text-xs mr-1 hidden sm:block" style={{ color: '#878787' }}>
-            CBS StatLine × PDOK
+            {t.dataSources}
           </span>
+          <LangToggle />
           <ThemeToggle />
         </div>
       </header>

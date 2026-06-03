@@ -2,6 +2,7 @@
 
 import { create } from 'zustand'
 import { api, ApiError } from '../api/client'
+import { useLangStore } from './langStore'
 import type {
   ChartDataPoint,
   ChatState,
@@ -17,31 +18,15 @@ const uid = () => `msg-${Date.now()}-${++idCounter}`
 
 // ── Greeting fast-path (instant response, no backend call) ────────────────────
 const _GREETINGS = new Set([
-  // Dutch
   'hi', 'hello', 'hoi', 'hey', 'hallo', 'dag', 'yo', 'sup', 'howdy',
   'goedemorgen', 'goedemiddag', 'goedenavond', 'good morning', 'good afternoon',
-  // Casual / slang
-  'wasup', 'wassup', 'heya', 'hiya', 'yo',
-  // Laughs / reactions (not a real question)
+  'wasup', 'wassup', 'heya', 'hiya',
   'haha', 'hahaha', 'lol', 'lmao', 'rofl', 'xd', ':)', ':d', '😂', '😄', '😊',
-  // Exclamations
   'wow', 'wauw', 'whoa', 'woah', 'omg', 'wtf', 'damn', 'tof', 'gaaf',
   'interessant', 'interesting', 'echt', 'serieus',
-  // Thanks / acknowledgements
   'ok', 'oke', 'oks', 'thanks', 'thx', 'bedankt', 'dankjewel', 'dank',
   'cool', 'nice', 'great', 'awesome', 'perfect', 'mooi', 'goed', 'top',
 ])
-const _CASUAL_REPLIES = [
-  'Ha! Vraag me iets over Nederlandse statistieken — bijv. "Gasverbruik per gemeente" of "Bevolkingsdichtheid in Amsterdam".',
-  'Haha 😄 Kom maar op met een vraag over CBS-data. Probeer: "WOZ-waarde per gemeente in Utrecht".',
-  '😄 Ik ben er klaar voor. Stel een vraag over Nederlandse regionale cijfers!',
-]
-const _GREETING_REPLIES = [
-  'Hallo! Vraag me iets over Nederlandse regionale statistieken. Probeer: "Bevolkingsdichtheid per gemeente" of "WOZ-waarde in Amsterdam".',
-  'Hey! Ik maak interactieve kaarten van CBS-kerncijfers per gemeente. Wat wil je weten?',
-  'Hi! Ask me about Dutch regional stats — housing values, population, income, or demographics per municipality. Type a question or pick an example.',
-  'Hoi! Ik laat CBS-statistieken op een kaart zien. Probeer: "Inkomen per gemeente" of "Vergelijk Amsterdam met omliggende gemeenten".',
-]
 function _isCasual(text: string): boolean {
   const clean = text.trim().toLowerCase().replace(/[!?.,\s]+$/, '')
   // Pure laugh / emoji / casual acknowledgement (up to 4 words)
@@ -55,8 +40,8 @@ function _isGreeting(text: string): boolean {
   const words = text.trim().toLowerCase().replace(/[!?.,]+$/, '').split(/\s+/)
   return words.length <= 3 && words.some(w => _GREETINGS.has(w))
 }
-function _randomGreetingReply(): string {
-  return _GREETING_REPLIES[Math.floor(Math.random() * _GREETING_REPLIES.length)]
+function _pick<T>(arr: readonly T[]): T {
+  return arr[Math.floor(Math.random() * arr.length)]
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -99,11 +84,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     // Fast-path: greeting or casual reaction → instant reply, no LLM call needed
     if (_isGreeting(text) || _isCasual(text)) {
-      const replies = _isGreeting(text) ? _GREETING_REPLIES : _CASUAL_REPLIES
+      const { t } = useLangStore.getState()
+      const replyPool = _isGreeting(text) ? t.greetingReplies : t.casualReplies
       const greetMsg: Message = {
         id: uid(),
         role: 'assistant',
-        content: replies[Math.floor(Math.random() * replies.length)],
+        content: _pick(replyPool),
         timestamp: Date.now(),
       }
       set({ messages: [...messages, userMsg, greetMsg] })
@@ -113,7 +99,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set({ messages: [...messages, userMsg], isLoading: true, error: null })
 
     try {
-      const response = await api.chat({ message: contextualText, history })
+      const { lang } = useLangStore.getState()
+      const response = await api.chat({ message: contextualText, history, lang })
 
       // Build chart data from top-10 regions by value (choropleth only)
       let chartData: ChartDataPoint[] | undefined
@@ -181,13 +168,8 @@ export const useChatStore = create<ChatState>((set, get) => ({
   selectRegion: (region: SelectedRegion | null) => {
     if (region) {
       const name = region.statnaam
-      // Always show gemeente-level suggestions regardless of what was clicked
-      const suggestions = [
-        `Wat is de bevolkingsdichtheid in ${name}?`,
-        `WOZ-waarde in ${name}`,
-        `Inkomen per inwoner in ${name}`,
-        `Vergelijk ${name} met omliggende gemeenten`,
-      ]
+      const { t } = useLangStore.getState()
+      const suggestions = t.regionSuggestions(name)
       const sysMsg: Message = {
         id: uid(),
         role: 'system',
