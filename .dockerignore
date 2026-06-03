@@ -1,0 +1,18 @@
+# Dependencies
+frontend/node_modules/
+**/__pycache__/
+**/*.pyc
+**/.pytest_cache/
+
+# Data files (populated at runtime via volume)
+backend/data/
+
+# Dev/local files
+.env
+.claude/
+backend.log
+*.log
+
+# Git
+.git/
+.gitignore

@@ -1,0 +1,93 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    color: #091D23;
+    font-family: 'Akko Pro', system-ui, sans-serif;
+  }
+  .dark body {
+    color: #e9e9e9;
+  }
+}
+
+/* ── CBS Design System fonts ─────────────────────────────────────────────── */
+@font-face {
+  font-family: 'Akko Pro';
+  src: url('https://cdn.cbs.nl/cdn/fonts/akko-regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Soho Pro';
+  src: url('https://cdn.cbs.nl/cdn/fonts/soho-medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* ── MapLibre GL overrides ───────────────────────────────────────────────── */
+.maplibregl-map {
+  font-family: 'Akko Pro', system-ui, sans-serif;
+}
+
+.maplibregl-ctrl-attrib {
+  font-size: 10px;
+  opacity: 0.7;
+}
+
+.maplibregl-ctrl-group {
+  @apply shadow-md border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden;
+}
+
+.maplibregl-ctrl button {
+  @apply bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200;
+}
+
+.maplibregl-ctrl button:hover {
+  @apply bg-gray-50 dark:bg-gray-700;
+}
+
+/* ── Scrollbar styling ───────────────────────────────────────────────────── */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: theme('colors.gray.300') transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+}
+
+/* ── Chat message animations ─────────────────────────────────────────────── */
+.message-enter {
+  animation: slideUp 0.25s ease-out;
+}
+
+/* ── Resize handle ───────────────────────────────────────────────────────── */
+.resize-handle {
+  cursor: col-resize;
+  transition: background-color 0.15s;
+}
+
+.resize-handle:hover,
+.resize-handle.dragging {
+  @apply bg-brand-400;
+}
+
+/* ── JSON syntax highlight (minimal) ────────────────────────────────────── */
+.json-key   { @apply text-blue-600 dark:text-blue-400; }
+.json-str   { @apply text-green-600 dark:text-green-400; }
+.json-num   { @apply text-orange-500 dark:text-orange-400; }
+.json-bool  { @apply text-purple-600 dark:text-purple-400; }
+.json-null  { @apply text-gray-400; }
