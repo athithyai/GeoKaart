@@ -562,8 +562,20 @@ def _apply_isochrone_guard(message: str, plan: "MapPlan") -> "MapPlan":
     if not (_ISO_PATTERN.search(message) and _STATION_PATTERN.search(message)):
         return plan  # not an isochrone query
     logger.info("Pre-classifier: overriding intent → isochrone_stats for %r", message[:80])
-    m = _re.search(r'\b(\d+)[-\s]*min', message, _re.IGNORECASE)
-    minutes = int(m.group(1)) if m else 10
+
+    # Extract ALL ring values — handle "5, 10, 20 min" or "5 and 10 and 20 min"
+    # Strategy: find ALL numbers within 25 chars before the first "min" occurrence
+    min_match = _re.search(r'(\d+)[-\s]*(?:min(?:ute)?s?|minuten?)', message, _re.IGNORECASE)
+    if min_match:
+        # Look backwards from the "min" for any digits (comma/space separated)
+        preceding = message[:min_match.end()]
+        all_nums = _re.findall(r'\b(\d+)\b', preceding)
+        ring_list = sorted(set(int(n) for n in all_nums if 1 <= int(n) <= 120))
+        if not ring_list:
+            ring_list = [int(min_match.group(1))]
+    else:
+        ring_list = [10]
+    minutes = ring_list[0]  # kept for compat, iso_minutes uses ring_list
     origin_m = (
         _re.search(r'from\s+([A-Za-z\s\-]+?)(?:\s+within|\s+in\s+\d|\?|$)', message, _re.IGNORECASE)
         or _re.search(r'van\s+([A-Za-z\s\-]+?)\s+(?:binnen|in\s+\d)', message, _re.IGNORECASE)
@@ -579,7 +591,7 @@ def _apply_isochrone_guard(message: str, plan: "MapPlan") -> "MapPlan":
     updates: dict = {
         "intent":          "isochrone_stats",
         "iso_origin":      origin,
-        "iso_minutes":     [minutes],
+        "iso_minutes":     ring_list,
         "iso_mode":        mode,
         "geography_level": "wijk",
     }
@@ -968,54 +980,99 @@ async def chat_endpoint(body: ChatRequest):
                 warnings=warnings,
             )
 
-        # Step 3: fetch CBS stats for the region
-        from cbs_client import get_observations as _get_obs
-        import duckdb_client as _ddb
-        df = _ddb.get_observations_local(
-            plan.table_id, plan.measure_code, plan.geography_level, plan.region_scope
-        )
-        if df is None or df.empty:
+        # Step 3: build travel-time band GeoJSON — sections colored by time, not admin areas
+        # This is the primary visual. CBS stats go to the narrator + ring_summary table.
+        from shapely.geometry import shape as _shape, mapping as _mapping
+        from shapely.ops import unary_union as _unary_union
+
+        # Colour ramp for time bands (warm = closer, cool = further)
+        _RING_COLORS = ["#fee08b", "#fc8d59", "#d73027", "#a50026", "#67000d"]
+        _RING_OPACITY = 0.55
+
+        # Build cumulative shapely geometries (ORS returns full polygons, not donuts)
+        ring_geoms = []
+        for rf in ring_features:
             try:
+                ring_geoms.append(_shape(rf["geometry"]))
+            except Exception:
+                ring_geoms.append(None)
+
+        band_features = []
+        sorted_rings = sorted(zip(ring_minutes, ring_features, ring_geoms), key=lambda x: x[0])
+
+        for i, (mins, rf, geom) in enumerate(sorted_rings):
+            if geom is None:
+                continue
+            # Exclusive donut: subtract inner rings
+            if i > 0:
+                inner_geoms = [g for _, _, g in sorted_rings[:i] if g is not None]
+                try:
+                    inner_union = _unary_union(inner_geoms)
+                    band_geom = geom.difference(inner_union)
+                except Exception:
+                    band_geom = geom
+            else:
+                band_geom = geom
+
+            color = _RING_COLORS[min(i, len(_RING_COLORS) - 1)]
+            band_features.append({
+                "type": "Feature",
+                "geometry": _mapping(band_geom),
+                "properties": {
+                    "minutes":  mins,
+                    "color":    color,
+                    "label":    f"{mins} min",
+                    "value":    mins,       # used by DataTable sort
+                    "statnaam": f"{mins}-min zone",
+                    "statcode": f"ISO_{mins}",
+                    "opacity":  _RING_OPACITY,
+                },
+            })
+
+        enriched: dict = {
+            "type": "FeatureCollection",
+            "features": band_features,
+            "meta": {
+                "measure_code": "travel_minutes",
+                "period":       "",
+                "breaks":       [m for m, *_ in sorted_rings],
+                "colors":       [_RING_COLORS[min(i, len(_RING_COLORS)-1)] for i in range(len(sorted_rings))],
+                "null_color":   "#2d2d2d",
+                "n_matched":    len(band_features),
+                "n_total":      len(ring_minutes),
+                "warnings":     [],
+            },
+        }
+
+        # Step 4: fetch CBS stats for narrator context (text + ring_summary only)
+        ring_summary: list[dict] | None = None
+        cbs_context: list[dict] = []
+
+        try:
+            from cbs_client import get_observations as _get_obs
+            import duckdb_client as _ddb
+            df = _ddb.get_observations_local(
+                plan.table_id, plan.measure_code, plan.geography_level, plan.region_scope
+            )
+            if df is None or df.empty:
                 df = await _get_obs(
                     plan.table_id, plan.measure_code, plan.geography_level, plan.region_scope, None
                 )
-            except Exception as exc:
-                warnings.append(f"CBS data fetch failed: {exc}")
-                df = None
-
-        if df is None or df.empty:
-            warnings.append(f"No CBS data available for {plan.measure_code}.")
-            enriched = {"type": "FeatureCollection", "features": [], "meta": {}}
-            ring_summary = None
-        else:
-            logger.info("Isochrone CBS data: %d rows, cols=%s", len(df), df.columns.tolist())
-            # Step 4: fuse isochrone × CBS stats
-            try:
-                if len(ring_features) == 1:
-                    enriched = await isochrone_fusion.fuse_isochrone_stats(
-                        iso_feature, df, plan.geography_level, plan.measure_code,
-                        plan.n_classes, plan.classification
-                    )
-                    ring_summary = None
-                else:
-                    enriched = await isochrone_fusion.fuse_multi_ring_stats(
-                        ring_features, df, plan.geography_level, plan.measure_code
-                    )
-                    ring_summary = enriched.pop("ring_summary", None)
-            except Exception as exc:
-                logger.exception("Fusion failed: %s", exc)
-                warnings.append(f"Spatial fusion failed: {exc}")
-                enriched = {"type": "FeatureCollection", "features": [], "meta": {}}
-                ring_summary = None
+            if df is not None and not df.empty:
+                logger.info("Isochrone CBS data: %d rows", len(df))
+                # Aggregate CBS data per ring band using spatial intersect
+                band_stats = await isochrone_fusion.fuse_multi_ring_stats(
+                    ring_features, df, plan.geography_level, plan.measure_code
+                )
+                ring_summary = band_stats.pop("ring_summary", None)
+                cbs_context = [
+                    {"minutes": r["minutes"], "avg": r.get("avg_value"), "max": r.get("max_value")}
+                    for r in (ring_summary or [])
+                ]
+        except Exception as exc:
+            logger.warning("CBS stats for isochrone failed (non-fatal): %s", exc)
 
         # Step 5: narrate
-        meta = enriched.get("meta")
-        n_matched = meta.get("n_matched", 0) if meta else 0
-        top_regions = sorted(
-            [f["properties"] for f in enriched.get("features", []) if f["properties"].get("value") is not None],
-            key=lambda p: p["value"], reverse=True
-        )[:5]
-
         mode_label = {"foot-walking": "walking", "cycling-regular": "cycling",
                       "cycling-electric": "e-bike", "driving-car": "driving"}.get(mode, mode)
         ring_str = " / ".join(f"{m} min" for m in ring_minutes)
@@ -1023,17 +1080,20 @@ async def chat_endpoint(body: ChatRequest):
             next((k for k in ("Gemiddeld", "Aantal", "Personen") if k in plan.measure_code), ""), ""
         ).strip()
 
+        # Build top_regions from CBS context for narrator
+        top_regions = [
+            {"statnaam": f"{c['minutes']}-min zone", "value": c["avg"], "label": str(c["avg"])}
+            for c in cbs_context if c.get("avg") is not None
+        ]
+
         reply = await generate_narration(
             user_message=body.message,
             plan=plan,
-            meta=meta,
+            meta=None,
             history=body.history,
             measure_label=measure_label,
             top_regions=top_regions or None,
         )
-
-        if n_matched == 0:
-            reply = f"The {ring_str} {mode_label} isochrone from {plan.iso_origin} was computed, but no CBS data matched the regions inside. {reply}"
 
         return ChatResponse(
             message=reply,

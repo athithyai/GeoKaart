@@ -122,7 +122,8 @@ export function MapPanel() {
           : ['case',
               ['boolean', ['feature-state', 'selected'], false], 0.95,
               ['boolean', ['feature-state', 'hover'],    false], 0.85,
-              0.72],
+              // Use per-feature opacity if present (isochrone bands), else default
+              ['coalesce', ['get', 'opacity'], 0.72]],
       },
     })
 
