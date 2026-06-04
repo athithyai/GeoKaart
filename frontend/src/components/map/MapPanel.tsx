@@ -6,7 +6,6 @@ import { MapLegend } from './MapLegend'
 import { MapTooltip } from './MapTooltip'
 import { MapControls } from './MapControls'
 import { MapSearch } from './MapSearch'
-import { useIsochroneLayer } from './IsochroneLayer'
 import type { ChoroplethFeatureProperties, ChoroplethMeta } from '../../types'
 
 const NL_CENTER: [number, number] = [5.2913, 52.1326]
@@ -39,9 +38,10 @@ export function MapPanel() {
   const [measureCode, setMeasureCode] = useState('')
   const [mapReady, setMapReady] = useState(false)
 
-  const currentGeoJSON  = useChatStore(s => s.currentGeoJSON)
-  const currentPlan     = useChatStore(s => s.currentPlan)
-  const isLoading       = useChatStore(s => s.isLoading)
+  const currentGeoJSON   = useChatStore(s => s.currentGeoJSON)
+  const currentIsochrone = useChatStore(s => s.currentIsochrone)
+  const currentPlan      = useChatStore(s => s.currentPlan)
+  const isLoading        = useChatStore(s => s.isLoading)
   const selectedRegion  = useChatStore(s => s.selectedRegion)
   const selectRegion    = useChatStore(s => s.selectRegion)
   const flyToStatcode   = useChatStore(s => s.flyToStatcode)
@@ -72,7 +72,47 @@ export function MapPanel() {
   }, [])
 
   // ── Isochrone layer ─────────────────────────────────────────────────────────
-  useIsochroneLayer({ mapRef, mapReady })
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const ISO_SRC  = 'isochrone-source'
+    const ISO_FILL = 'isochrone-fill'
+    const ISO_LINE = 'isochrone-line'
+
+    const safeRemove = (layerId: string) => { try { if (map.getLayer(layerId))  map.removeLayer(layerId)  } catch {} }
+    const safeRemSrc = (srcId: string)   => { try { if (map.getSource(srcId))   map.removeSource(srcId)   } catch {} }
+
+    if (!currentIsochrone) {
+      safeRemove(ISO_FILL)
+      safeRemove(ISO_LINE)
+      safeRemSrc(ISO_SRC)
+      return
+    }
+
+    const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [currentIsochrone] }
+
+    if (map.getSource(ISO_SRC)) {
+      ;(map.getSource(ISO_SRC) as maplibregl.GeoJSONSource).setData(data)
+    } else {
+      map.addSource(ISO_SRC, { type: 'geojson', data })
+      map.addLayer({ id: ISO_FILL, type: 'fill', source: ISO_SRC,
+        paint: { 'fill-color': '#00A1CD', 'fill-opacity': 0.18 } })
+      map.addLayer({ id: ISO_LINE, type: 'line', source: ISO_SRC,
+        paint: { 'line-color': '#00A1CD', 'line-width': 3, 'line-dasharray': [4, 2] } })
+    }
+
+    // Auto-zoom to isochrone bounds
+    try {
+      const coords = (currentIsochrone.geometry as GeoJSON.Polygon).coordinates[0]
+      if (coords?.length) {
+        const lons = coords.map(c => c[0])
+        const lats = coords.map(c => c[1])
+        map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+          { padding: 80, duration: 1200, maxZoom: 14 })
+      }
+    } catch {}
+  }, [mapReady, currentIsochrone])
 
   // ── Update choropleth when GeoJSON changes ──────────────────────────────────
   useEffect(() => {
