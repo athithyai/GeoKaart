@@ -47,9 +47,6 @@ export function MapPanel() {
   const flyToStatcode   = useChatStore(s => s.flyToStatcode)
   const setFlyTo        = useChatStore(s => s.setFlyTo)
 
-  // ── Isochrone layer ─────────────────────────────────────────────────────────
-  useIsochroneLayer({ map: mapRef.current! })
-
   // ── Init map ────────────────────────────────────────────────────────────────
   useEffect(() => {
     if (!mapContainer.current || mapRef.current) return
@@ -73,6 +70,9 @@ export function MapPanel() {
       mapRef.current = null
     }
   }, [])
+
+  // ── Isochrone layer ─────────────────────────────────────────────────────────
+  useIsochroneLayer({ mapRef, mapReady })
 
   // ── Update choropleth when GeoJSON changes ──────────────────────────────────
   useEffect(() => {
