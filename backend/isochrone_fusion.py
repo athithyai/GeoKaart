@@ -35,8 +35,8 @@ from join_engine import _compute_breaks as _classify, _format_value, _PALETTES, 
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PALETTE = _JOIN_DEFAULT_PALETTE   # "Brand"
-_NULL_COLOR = "#D9D9D9"
+_DEFAULT_PALETTE = "YlOrRd"   # warm palette visible on dark map
+_NULL_COLOR = "#2d2d2d"
 
 
 # ── Geometry helpers ──────────────────────────────────────────────────────────

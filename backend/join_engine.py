@@ -35,31 +35,45 @@ logger = logging.getLogger(__name__)
 # ── ColorBrewer sequential palettes (5-class and 7-class) ────────────────────
 
 _PALETTES: dict[str, list[list[str]]] = {
-    # Brand palette — cyan (#00A1CD) → deep navy (#271D6C)
-    "Brand": [
-        ["#e0f5fc", "#7dd4e8", "#00A1CD", "#1b3678", "#271D6C"],
-        ["#e0f5fc", "#9de3f1", "#4dc4e0", "#00A1CD", "#0e5d9c", "#1b3678", "#271D6C"],
+    # Plasma — purple → magenta → orange → yellow. Best on dark maps.
+    "Plasma": [
+        ["#440154", "#3b528b", "#21918c", "#5ec962", "#fde725"],
+        ["#440154", "#472d7b", "#3b528b", "#2c728e", "#21918c", "#5ec962", "#fde725"],
     ],
+    # YlOrRd — yellow → orange → deep red. High contrast, intuitive for intensity.
     "YlOrRd": [
         ["#ffffb2", "#fecc5c", "#fd8d3c", "#f03b20", "#bd0026"],
         ["#ffffb2", "#fed976", "#feb24c", "#fd8d3c", "#f03b20", "#bd0026", "#800026"],
     ],
+    # Magma — dark purple → orange → light yellow. Beautiful on dark maps.
+    "Magma": [
+        ["#000004", "#3b0f70", "#8c2981", "#de4968", "#fde0dd"],
+        ["#000004", "#180f3d", "#440f76", "#7e2482", "#bd3786", "#ed6925", "#fcfdbf"],
+    ],
+    # Blues — light → dark blue. For water/density data on light maps.
     "Blues": [
         ["#eff3ff", "#bdd7e7", "#6baed6", "#3182bd", "#08519c"],
         ["#eff3ff", "#c6dbef", "#9ecae1", "#6baed6", "#3182bd", "#08519c", "#08306b"],
     ],
+    # Greens — for environmental / land use data.
     "Greens": [
         ["#edf8e9", "#bae4b3", "#74c476", "#31a354", "#006d2c"],
         ["#edf8e9", "#c7e9c0", "#a1d99b", "#74c476", "#41ab5d", "#238b45", "#005a32"],
     ],
-    "PuRd": [
-        ["#f1eef6", "#d7b5d8", "#df65b0", "#dd1c77", "#980043"],
-        ["#f1eef6", "#d4b9da", "#c994c7", "#df65b0", "#e7298a", "#ce1256", "#91003f"],
+    # RdYlGn — red → yellow → green. Diverging: good for poverty / wealth comparisons.
+    "RdYlGn": [
+        ["#d7191c", "#fdae61", "#ffffbf", "#a6d96a", "#1a9641"],
+        ["#d73027", "#f46d43", "#fdae61", "#fee08b", "#d9ef8b", "#a6d96a", "#1a9641"],
+    ],
+    # Brand (kept for backward compat) — but no longer default
+    "Brand": [
+        ["#e0f5fc", "#7dd4e8", "#00A1CD", "#1b3678", "#271D6C"],
+        ["#e0f5fc", "#9de3f1", "#4dc4e0", "#00A1CD", "#0e5d9c", "#1b3678", "#271D6C"],
     ],
 }
 
-_NULL_COLOR = "#cccccc"
-_DEFAULT_PALETTE = "Brand"
+_NULL_COLOR = "#2d2d2d"          # dark grey — invisible gap on dark maps
+_DEFAULT_PALETTE = "YlOrRd"     # warm yellow→red: pops on dark map, clear gradient
 
 
 # ── Classification ────────────────────────────────────────────────────────────
