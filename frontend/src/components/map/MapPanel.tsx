@@ -32,6 +32,7 @@ export function MapPanel() {
   const hoveredId       = useRef<string | number | null>(null)
   const selectedId      = useRef<string | number | null>(null)
   const isBoundaryOnly  = useRef(false)
+  const isoMarkerRef    = useRef<maplibregl.Marker | null>(null)   // origin pin
 
   const [tooltip,  setTooltip]  = useState<TooltipState | null>(null)
   const [meta,     setMeta]     = useState<ChoroplethMeta | null>(null)
@@ -207,6 +208,8 @@ export function MapPanel() {
       safe(() => { if (map.getLayer(ISO_LINE)) map.removeLayer(ISO_LINE) })
       safe(() => { if (map.getLayer(ISO_FILL)) map.removeLayer(ISO_FILL) })
       safe(() => { if (map.getSource(ISO_SRC)) map.removeSource(ISO_SRC) })
+      // Remove origin marker
+      if (isoMarkerRef.current) { isoMarkerRef.current.remove(); isoMarkerRef.current = null }
       return
     }
 
@@ -231,6 +234,42 @@ export function MapPanel() {
         paint: { 'line-color': '#00A1CD', 'line-width': 3, 'line-dasharray': [4, 2] },
       })
     }
+
+    // Origin marker — pulsing pin at the station/point
+    safe(() => {
+      const center = (currentIsochrone.properties as Record<string, unknown>)?.center as [number, number] | undefined
+      if (center && center.length === 2) {
+        // Remove previous marker
+        if (isoMarkerRef.current) isoMarkerRef.current.remove()
+
+        // Build a custom pulsing dot element
+        const el = document.createElement('div')
+        el.style.cssText = `
+          width: 18px; height: 18px; border-radius: 50%;
+          background: #00A1CD;
+          border: 3px solid white;
+          box-shadow: 0 0 0 3px rgba(0,161,205,0.4), 0 2px 8px rgba(0,0,0,0.4);
+          cursor: default;
+        `
+        // Pulsing ring animation
+        el.innerHTML = `<style>
+          @keyframes iso-pulse {
+            0%   { box-shadow: 0 0 0 3px rgba(0,161,205,0.4), 0 2px 8px rgba(0,0,0,0.4); }
+            50%  { box-shadow: 0 0 0 8px rgba(0,161,205,0.1), 0 2px 8px rgba(0,0,0,0.4); }
+            100% { box-shadow: 0 0 0 3px rgba(0,161,205,0.4), 0 2px 8px rgba(0,0,0,0.4); }
+          }
+        </style>`
+        el.style.animation = 'iso-pulse 2s ease-in-out infinite'
+
+        const label = (currentIsochrone.properties as Record<string, unknown>)?.mode
+          ? `${currentIsochrone.properties?.minutes ?? ''}min ${currentIsochrone.properties?.mode ?? ''}` : ''
+        if (label) el.title = label
+
+        isoMarkerRef.current = new maplibregl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([center[0], center[1]])
+          .addTo(map)
+      }
+    })
 
     // Fly to isochrone bounds
     safe(() => {
