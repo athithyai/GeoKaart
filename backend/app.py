@@ -958,27 +958,21 @@ async def chat_endpoint(body: ChatRequest):
         origin_lon, origin_lat = origin["lon"], origin["lat"]
         logger.info("Isochrone origin: %s → (%.4f, %.4f)", plan.iso_origin, origin_lon, origin_lat)
 
-        # Step 2: fetch isochrone(s) from ORS
-        try:
-            if len(ring_minutes) == 1:
-                iso_feature = await routing_client.get_isochrone(
-                    origin_lon, origin_lat, ring_minutes[0], mode
-                )
-                ring_features = [iso_feature]
-            else:
-                ring_features = await routing_client.get_multi_ring_isochrones(
-                    origin_lon, origin_lat, ring_minutes, mode
-                )
-                iso_feature = ring_features[-1]  # outermost ring for overlay
-        except Exception as exc:
-            logger.warning("ORS isochrone failed: %s", exc)
-            warnings.append(f"Routing service unavailable: {exc}")
-            return ChatResponse(
-                message=f"Could not compute isochrone from '{plan.iso_origin}'. The routing service may be unavailable or rate-limited. Try again shortly.",
-                plan=plan,
-                geojson={"type": "FeatureCollection", "features": []},
-                warnings=warnings,
+        # Step 2: fetch isochrone(s) — ORS with automatic retry + Euclidean fallback
+        if len(ring_minutes) == 1:
+            iso_feature = await routing_client.get_isochrone(
+                origin_lon, origin_lat, ring_minutes[0], mode
             )
+            ring_features = [iso_feature]
+        else:
+            ring_features = await routing_client.get_multi_ring_isochrones(
+                origin_lon, origin_lat, ring_minutes, mode
+            )
+            iso_feature = ring_features[-1]  # outermost ring for overlay
+
+        # Note if fallback was used
+        if iso_feature.get("properties", {}).get("fallback"):
+            warnings.append("OpenRouteService is currently unavailable — showing approximate circular buffer instead of road-network isochrone.")
 
         # Step 3: build travel-time band GeoJSON — sections colored by time, not admin areas
         # This is the primary visual. CBS stats go to the narrator + ring_summary table.
