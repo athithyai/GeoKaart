@@ -71,49 +71,6 @@ export function MapPanel() {
     }
   }, [])
 
-  // ── Isochrone layer ─────────────────────────────────────────────────────────
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map || !mapReady) return
-
-    const ISO_SRC  = 'isochrone-source'
-    const ISO_FILL = 'isochrone-fill'
-    const ISO_LINE = 'isochrone-line'
-
-    const safeRemove = (layerId: string) => { try { if (map.getLayer(layerId))  map.removeLayer(layerId)  } catch {} }
-    const safeRemSrc = (srcId: string)   => { try { if (map.getSource(srcId))   map.removeSource(srcId)   } catch {} }
-
-    if (!currentIsochrone) {
-      safeRemove(ISO_FILL)
-      safeRemove(ISO_LINE)
-      safeRemSrc(ISO_SRC)
-      return
-    }
-
-    const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [currentIsochrone] }
-
-    if (map.getSource(ISO_SRC)) {
-      ;(map.getSource(ISO_SRC) as maplibregl.GeoJSONSource).setData(data)
-    } else {
-      map.addSource(ISO_SRC, { type: 'geojson', data })
-      map.addLayer({ id: ISO_FILL, type: 'fill', source: ISO_SRC,
-        paint: { 'fill-color': '#00A1CD', 'fill-opacity': 0.18 } })
-      map.addLayer({ id: ISO_LINE, type: 'line', source: ISO_SRC,
-        paint: { 'line-color': '#00A1CD', 'line-width': 3, 'line-dasharray': [4, 2] } })
-    }
-
-    // Auto-zoom to isochrone bounds
-    try {
-      const coords = (currentIsochrone.geometry as GeoJSON.Polygon).coordinates[0]
-      if (coords?.length) {
-        const lons = coords.map(c => c[0])
-        const lats = coords.map(c => c[1])
-        map.fitBounds([[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
-          { padding: 80, duration: 1200, maxZoom: 14 })
-      }
-    } catch {}
-  }, [mapReady, currentIsochrone])
-
   // ── Update choropleth when GeoJSON changes ──────────────────────────────────
   useEffect(() => {
     const map = mapRef.current
@@ -231,6 +188,64 @@ export function MapPanel() {
       map.fitBounds(bounds, { padding: 60, maxZoom: 13, duration: 800 })
     }
   }, [currentGeoJSON, mapReady])
+
+  // ── Isochrone layer — runs AFTER choropleth so it renders on top ─────────────
+  // The choropleth fill has opacity 0.72 and would bury the ring if added first.
+  // Strategy:
+  //   ISO_FILL  → inserted BEFORE choropleth-fill  (shows through semi-transparent choro)
+  //   ISO_LINE  → added LAST (no beforeId)          → always on top, always visible
+  useEffect(() => {
+    const map = mapRef.current
+    if (!map || !mapReady) return
+
+    const ISO_SRC  = 'isochrone-source'
+    const ISO_FILL = 'isochrone-fill'
+    const ISO_LINE = 'isochrone-line'
+    const safe = (fn: () => void) => { try { fn() } catch {} }
+
+    if (!currentIsochrone) {
+      safe(() => { if (map.getLayer(ISO_LINE)) map.removeLayer(ISO_LINE) })
+      safe(() => { if (map.getLayer(ISO_FILL)) map.removeLayer(ISO_FILL) })
+      safe(() => { if (map.getSource(ISO_SRC)) map.removeSource(ISO_SRC) })
+      return
+    }
+
+    const data: GeoJSON.FeatureCollection = { type: 'FeatureCollection', features: [currentIsochrone] }
+
+    if (map.getSource(ISO_SRC)) {
+      // Source exists — just update data, layers stay in place
+      ;(map.getSource(ISO_SRC) as maplibregl.GeoJSONSource).setData(data)
+    } else {
+      map.addSource(ISO_SRC, { type: 'geojson', data })
+
+      // Fill: slot UNDER choropleth (before choropleth-fill if it exists)
+      const beforeFill = map.getLayer(FILL_LAYER) ? FILL_LAYER : undefined
+      map.addLayer({
+        id: ISO_FILL, type: 'fill', source: ISO_SRC,
+        paint: { 'fill-color': '#00A1CD', 'fill-opacity': 0.14 },
+      }, beforeFill)
+
+      // Outline: always on top (no beforeId = last layer = above everything)
+      map.addLayer({
+        id: ISO_LINE, type: 'line', source: ISO_SRC,
+        paint: { 'line-color': '#00A1CD', 'line-width': 3, 'line-dasharray': [4, 2] },
+      })
+    }
+
+    // Fly to isochrone bounds
+    safe(() => {
+      const geom = currentIsochrone.geometry as GeoJSON.Polygon | GeoJSON.MultiPolygon
+      const ring = geom.type === 'Polygon' ? geom.coordinates[0] : geom.coordinates[0][0]
+      if (ring?.length) {
+        const lons = ring.map(c => c[0])
+        const lats = ring.map(c => c[1])
+        map.fitBounds(
+          [[Math.min(...lons), Math.min(...lats)], [Math.max(...lons), Math.max(...lats)]],
+          { padding: 80, duration: 1200, maxZoom: 14 }
+        )
+      }
+    })
+  }, [mapReady, currentIsochrone])
 
   // ── Sync external deselect (X button in MapControls) ───────────────────────
   useEffect(() => {
