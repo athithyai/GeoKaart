@@ -537,13 +537,16 @@ _PROVINCE_CANONICAL: dict[str, str] = {
 import re as _re
 
 _ISO_PATTERN = _re.compile(
-    r'\b(\d+)\s*(?:min(?:ute)?s?|minuten?)\b'
-    r'|within\s+\d+\s*min'
-    r'|in\s+\d+\s*min'
+    # Matches: "10 min", "10-minute", "10 minutes", "10 minuten", etc.
+    r'\b(\d+)[-\s]*(?:min(?:ute)?s?|minuten?)\b'
+    # Matches: "within 10 min", "within a 10-min", "within a 10-minute"
+    r'|within\s+(?:a\s+)?(?:an?\s+)?\d+[-\s]*min'
+    r'|in\s+(?:a\s+)?(?:an?\s+)?\d+[-\s]*min'
     r'|binnen\s+\d+\s*minuten?'
     r'|bereikbaar\s+in'
     r'|reachable\s+in'
-    r'|\d+\s*min\s+(?:walk|cycling|drive|lopen|fietsen|rijden)',
+    # Matches: "10 min walk", "10-min cycling"
+    r'|\d+[-\s]*min\s+(?:walk|cycling|drive|lopen|fietsen|rijden)',
     _re.IGNORECASE,
 )
 _STATION_PATTERN = _re.compile(
@@ -559,7 +562,7 @@ def _apply_isochrone_guard(message: str, plan: "MapPlan") -> "MapPlan":
     if not (_ISO_PATTERN.search(message) and _STATION_PATTERN.search(message)):
         return plan  # not an isochrone query
     logger.info("Pre-classifier: overriding intent → isochrone_stats for %r", message[:80])
-    m = _re.search(r'\b(\d+)\s*min', message, _re.IGNORECASE)
+    m = _re.search(r'\b(\d+)[-\s]*min', message, _re.IGNORECASE)
     minutes = int(m.group(1)) if m else 10
     origin_m = (
         _re.search(r'from\s+([A-Za-z\s\-]+?)(?:\s+within|\s+in\s+\d|\?|$)', message, _re.IGNORECASE)
