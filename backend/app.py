@@ -534,13 +534,77 @@ _PROVINCE_CANONICAL: dict[str, str] = {
 }
 
 
+import re as _re
+
+_ISO_PATTERN = _re.compile(
+    r'\b(\d+)\s*(?:min(?:ute)?s?|minuten?)\b'
+    r'|within\s+\d+\s*min'
+    r'|in\s+\d+\s*min'
+    r'|binnen\s+\d+\s*minuten?'
+    r'|bereikbaar\s+in'
+    r'|reachable\s+in'
+    r'|\d+\s*min\s+(?:walk|cycling|drive|lopen|fietsen|rijden)',
+    _re.IGNORECASE,
+)
+_STATION_PATTERN = _re.compile(
+    r'\b(centraal|station|cs\b|airport|luchthaven)\b', _re.IGNORECASE
+)
+
+
+def _apply_isochrone_guard(message: str, plan: "MapPlan") -> "MapPlan":
+    """Override plan intent to isochrone_stats when the message contains
+    travel-time + station patterns that the LLM missed or misclassified."""
+    if plan.intent == "isochrone_stats":
+        return plan  # already correct
+    if not (_ISO_PATTERN.search(message) and _STATION_PATTERN.search(message)):
+        return plan  # not an isochrone query
+    logger.info("Pre-classifier: overriding intent → isochrone_stats for %r", message[:80])
+    m = _re.search(r'\b(\d+)\s*min', message, _re.IGNORECASE)
+    minutes = int(m.group(1)) if m else 10
+    origin_m = (
+        _re.search(r'from\s+([A-Za-z\s\-]+?)(?:\s+within|\s+in\s+\d|\?|$)', message, _re.IGNORECASE)
+        or _re.search(r'van\s+([A-Za-z\s\-]+?)\s+(?:binnen|in\s+\d)', message, _re.IGNORECASE)
+    )
+    origin = origin_m.group(1).strip().rstrip("?.,") if origin_m else "Rotterdam Centraal"
+    mode = "foot-walking"
+    if _re.search(r'\b(bike|cycling|fiets)\b', message, _re.IGNORECASE):
+        mode = "cycling-regular"
+    elif _re.search(r'\b(car|drive|auto|rijden)\b', message, _re.IGNORECASE):
+        mode = "driving-car"
+
+    # Infer measure from message when the planner used the fallback default
+    updates: dict = {
+        "intent":          "isochrone_stats",
+        "iso_origin":      origin,
+        "iso_minutes":     [minutes],
+        "iso_mode":        mode,
+        "geography_level": "wijk",
+    }
+    if plan.measure_code in ("AantalInwoners_5",):  # planner used default → infer
+        if _re.search(r'\b(income|inkomen|salary|loon|wealth|vermogen|rich|rijk|arm|pover)\b', message, _re.IGNORECASE):
+            updates["measure_code"] = "GemiddeldInkomenPerInwoner_78"
+            updates["table_id"]     = "85984NED"
+        elif _re.search(r'\b(woz|house\s*value|huis|woning|property)\b', message, _re.IGNORECASE):
+            updates["measure_code"] = "GemiddeldeWOZWaardeVanWoningen_39"
+            updates["table_id"]     = "86165NED"
+        elif _re.search(r'\b(population|bevolking|people|inwoners|residents)\b', message, _re.IGNORECASE):
+            pass  # AantalInwoners_5 is already correct
+    return plan.model_copy(update=updates)
+
+
 def _correct_region_scope(message: str, plan: "MapPlan") -> "MapPlan":
     """Post-hoc correction of region/province scope.
 
     1. For wijk/buurt: province_scope is meaningless — clear it and use a city GM code.
     2. For gemeente: if a province name is in the message, set province_scope.
     3. For gemeente: if a city name is in the message, set region_scope.
+
+    Note: isochrone_stats queries skip region_scope correction — they need ALL
+    regions to be loaded so the spatial intersect can find which ones overlap
+    the isochrone polygon.
     """
+    if plan.intent == "isochrone_stats":
+        return plan   # spatial filter is done via polygon, not region_scope
     lower = message.lower()
 
     # ── wijk / buurt: province filtering doesn't apply — need a GM region_scope ──
@@ -770,12 +834,20 @@ async def chat_endpoint(body: ChatRequest):
             n_classes=5,
             message="Sorry, I didn't quite understand that.",
         )
-        return ChatResponse(
-            message=_FALLBACK_MESSAGE,
-            plan=fallback_plan,
-            geojson={"type": "FeatureCollection", "features": []},
-            warnings=[],
-        )
+        # Even on planner failure, rescue travel-time queries
+        rescued = _apply_isochrone_guard(body.message, fallback_plan)
+        if rescued.intent == "isochrone_stats":
+            plan = rescued
+        else:
+            return ChatResponse(
+                message=_FALLBACK_MESSAGE,
+                plan=fallback_plan,
+                geojson={"type": "FeatureCollection", "features": []},
+                warnings=[],
+            )
+
+    # Apply isochrone guard immediately after planning (before any early returns)
+    plan = _apply_isochrone_guard(body.message, plan)
 
     # Guard: only allow priority (kerncijfers) tables
     if plan.table_id not in _PRIORITY_TABLES:
@@ -913,6 +985,7 @@ async def chat_endpoint(body: ChatRequest):
             enriched = {"type": "FeatureCollection", "features": [], "meta": {}}
             ring_summary = None
         else:
+            logger.info("Isochrone CBS data: %d rows, cols=%s", len(df), df.columns.tolist())
             # Step 4: fuse isochrone × CBS stats
             try:
                 if len(ring_features) == 1:

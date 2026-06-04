@@ -31,11 +31,11 @@ from shapely.ops import unary_union
 
 import duckdb_client
 import spatial_service
-from join_engine import _classify, _format_value, _PALETTES
+from join_engine import _compute_breaks as _classify, _format_value, _PALETTES, _assign_class, _get_palette, _DEFAULT_PALETTE as _JOIN_DEFAULT_PALETTE
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_PALETTE = "Brand"
+_DEFAULT_PALETTE = _JOIN_DEFAULT_PALETTE   # "Brand"
 _NULL_COLOR = "#D9D9D9"
 
 
@@ -112,12 +112,11 @@ def _build_choropleth(
     if not values:
         return {"type": "FeatureCollection", "features": [], "meta": {"n_matched": 0, "n_total": len(rows)}}
 
-    palette = _PALETTES.get(palette_name, _PALETTES[_DEFAULT_PALETTE])
-    colors = palette[0] if n_classes <= 5 else palette[1]
+    colors = _get_palette(palette_name, n_classes)
     n_classes = len(colors)
 
     breaks = _classify(np.array(values, dtype=float), n_classes, classification)
-    if breaks is None:
+    if not breaks:
         breaks = [min(values), max(values)]
 
     features = []
@@ -127,11 +126,7 @@ def _build_choropleth(
             color = _NULL_COLOR
             label = "—"
         else:
-            # Find bucket
-            bucket = min(
-                next((i for i, b in enumerate(breaks[1:]) if val <= b), n_classes - 1),
-                n_classes - 1,
-            )
+            bucket = min(_assign_class(val, breaks), n_classes - 1)
             color = colors[bucket]
             label = _format_value(val)
 
@@ -171,6 +166,7 @@ async def fuse_isochrone_stats(
     measure_code: str,
     n_classes: int = 5,
     classification: str = "quantile",
+    min_overlap: float | None = None,
 ) -> dict:
     """Fuse an isochrone polygon with CBS stats into an enriched GeoJSON.
 
@@ -188,13 +184,19 @@ async def fuse_isochrone_stats(
     iso_geom = _isochrone_to_shapely(isochrone_feature)
 
     # Load cached region geometries (PDOK disk cache — instant after warmup)
-    region_features = await spatial_service.get_geometries(geography_level, region_scope=None)
+    geojson = await spatial_service.get_geometries(geography_level, region_scope=None)
+    region_features = geojson.get("features", []) if isinstance(geojson, dict) else []
     if not region_features:
         logger.warning("No region geometries available for level=%s", geography_level)
         return {"type": "FeatureCollection", "features": [], "meta": {}}
 
+    # At gemeente level, the isochrone covers a tiny fraction of a large municipality —
+    # lower the overlap threshold so any overlap counts.
+    if min_overlap is None:
+        min_overlap = 0.001 if geography_level == "gemeente" else 0.05
+
     # Spatial intersect
-    intersecting = _intersect_regions(iso_geom, region_features)
+    intersecting = _intersect_regions(iso_geom, region_features, min_overlap_fraction=min_overlap)
     logger.info("Isochrone intersects %d %s regions", len(intersecting), geography_level)
 
     if not intersecting:
@@ -262,7 +264,8 @@ async def fuse_multi_ring_stats(
         bands.append((feat["properties"].get("minutes", (i + 1) * 5), band_geom))
 
     # Load geometries once
-    region_features = await spatial_service.get_geometries(geography_level, region_scope=None)
+    geojson = await spatial_service.get_geometries(geography_level, region_scope=None)
+    region_features = geojson.get("features", []) if isinstance(geojson, dict) else []
 
     code_col = next((c for c in stats_df.columns if c in ("WijkenEnBuurten", "RegioS")), stats_df.columns[0])
     val_col  = next((c for c in stats_df.columns if c != code_col), None)

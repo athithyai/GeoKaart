@@ -54,7 +54,11 @@ def _base_url() -> str:
 
 def _headers() -> dict[str, str]:
     key = get_settings().ORS_API_KEY
-    h: dict[str, str] = {"Content-Type": "application/json", "Accept": "application/json"}
+    h: dict[str, str] = {
+        "Content-Type": "application/json",
+        # ORS isochrones returns GeoJSON — must accept both
+        "Accept": "application/json, application/geo+json",
+    }
     if key:
         h["Authorization"] = key
     return h
