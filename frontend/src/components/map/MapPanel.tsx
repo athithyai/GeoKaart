@@ -15,7 +15,11 @@ const SOURCE_ID = 'choropleth-source'
 const FILL_LAYER = 'choropleth-fill'
 const OUTLINE_LAYER = 'choropleth-outline'
 const SELECTED_LAYER = 'choropleth-selected'
-const BASE_STYLE = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+const STYLE_LIGHT = 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json'
+const STYLE_DARK  = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json'
+
+// Use dark map by default — it makes choropleths pop
+const BASE_STYLE = STYLE_DARK
 
 interface TooltipState {
   x: number

@@ -155,25 +155,46 @@ function EmptyState({ onSend }: { onSend: (q: string) => void }) {
   const [expanded, setExpanded] = useState<string | null>(null)
 
   return (
-    <div className="flex-1 flex flex-col items-center p-4 gap-4
+    <div className="flex-1 flex flex-col items-center p-3 gap-3
                     text-center custom-scrollbar overflow-y-auto">
       {/* Welcome */}
       <div className="pt-2">
         <div className="mx-auto mb-3 w-12 h-12">
           <LogoIcon size={48} />
         </div>
-        <h2 className="font-display font-medium text-base mb-1 leading-tight">
-          <span style={{ color: '#271D6C' }}>Cijfers</span><span style={{ color: '#00A1CD' }}>Chat</span>
+        <h2 className="font-bold text-base mb-1 leading-tight tracking-tight">
+          <span className="text-slate-800 dark:text-slate-100">Geo</span>
+          <span style={{ color: '#00A1CD' }}>Kaart</span>
         </h2>
-        <p className="text-xs max-w-xs" style={{ color: '#878787' }}>
-          Kies een categorie om CBS-data op de kaart te verkennen.
+        <p className="text-xs text-slate-400 dark:text-slate-500 max-w-xs">
+          Ask anything about any place in the Netherlands.
         </p>
+        {/* Quick prompts */}
+        <div className="mt-3 flex flex-col gap-1.5 text-left">
+          {[
+            '🗺️ Population density per municipality',
+            '💶 Income within 10 min walk from Rotterdam Centraal',
+            '🏠 House values by neighbourhood in Amsterdam',
+          ].map((q, i) => (
+            <button key={i} onClick={() => onSend(q.replace(/^.{2} /, ''))}
+              className="text-xs text-left px-3 py-2 rounded-xl border
+                         bg-white/60 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/80
+                         text-slate-600 dark:text-slate-300
+                         hover:bg-brand-50 dark:hover:bg-brand-900/20
+                         hover:border-brand-300 hover:text-brand-700
+                         dark:hover:border-brand-600 dark:hover:text-brand-300
+                         transition-all">
+              {q}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* 12 Category cards */}
       <div className="w-full">
-        <p className="font-display text-xs font-medium uppercase tracking-wider mb-2 text-left" style={{ color: '#878787' }}>
-          Categorieën
+        <p className="text-[10px] font-bold uppercase tracking-widest mb-2 text-left
+                      text-slate-400 dark:text-slate-500">
+          Browse by category
         </p>
         <div className="grid grid-cols-3 gap-1.5">
           {CATEGORIES.map(cat => (
@@ -183,12 +204,12 @@ function EmptyState({ onSend }: { onSend: (q: string) => void }) {
                 className={`w-full flex flex-col items-center gap-1 px-2 py-2.5 rounded-xl text-center
                             border transition-all duration-150 text-xs
                             ${expanded === cat.id
-                              ? 'bg-brand-50 dark:bg-brand-900/30 border-brand-300 dark:border-brand-600 text-brand-700 dark:text-brand-300'
-                              : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700 text-gray-700 dark:text-gray-300 hover:bg-brand-50 dark:hover:bg-gray-700 hover:border-brand-200 dark:hover:border-gray-600'
+                              ? 'bg-brand-400/10 dark:bg-brand-400/15 border-brand-400/40 dark:border-brand-400/30 text-brand-700 dark:text-brand-300'
+                              : 'bg-white/60 dark:bg-slate-800/60 border-slate-200/80 dark:border-slate-700/80 text-slate-600 dark:text-slate-300 hover:bg-brand-50 dark:hover:bg-brand-900/20 hover:border-brand-300/60 dark:hover:border-brand-600/40'
                             }`}
               >
-                <span className="text-base leading-none">{cat.icon}</span>
-                <span className="font-medium leading-tight">{cat.labelNl}</span>
+                <span className="text-sm leading-none">{cat.icon}</span>
+                <span className="font-medium leading-tight text-[11px]">{cat.labelNl}</span>
               </button>
             </div>
           ))}
@@ -200,20 +221,18 @@ function EmptyState({ onSend }: { onSend: (q: string) => void }) {
         const cat = CATEGORIES.find(c => c.id === expanded)!
         return (
           <div className="w-full space-y-1.5 animate-[slideUp_0.15s_ease-out]">
-            <p className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wider text-left">
-              {cat.icon} {cat.labelNl} — voorbeeldvragen
+            <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest text-left">
+              {cat.icon} {cat.labelNl}
             </p>
             {cat.examples.map(q => (
-              <button
-                key={q}
-                onClick={() => onSend(q)}
-                className="w-full text-left text-sm px-3.5 py-2.5 rounded-xl
-                           bg-gray-50 dark:bg-gray-800 hover:bg-brand-50 dark:hover:bg-gray-700
-                           text-gray-700 dark:text-gray-300 hover:text-brand-700
-                           dark:hover:text-brand-300 border border-gray-200 dark:border-gray-700
-                           hover:border-brand-300 dark:hover:border-brand-600
-                           transition-all duration-150"
-              >
+              <button key={q} onClick={() => onSend(q)}
+                className="w-full text-left text-xs px-3.5 py-2.5 rounded-xl
+                           bg-white/70 dark:bg-slate-800/60
+                           hover:bg-brand-50 dark:hover:bg-brand-900/20
+                           text-slate-600 dark:text-slate-300 hover:text-brand-700
+                           dark:hover:text-brand-300 border border-slate-200/80 dark:border-slate-700/80
+                           hover:border-brand-300/60 dark:hover:border-brand-600/40
+                           transition-all duration-150">
                 {q}
               </button>
             ))}
@@ -242,7 +261,7 @@ export function MessageList() {
   }
 
   return (
-    <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4 min-h-0">
+    <div className="flex-1 overflow-y-auto custom-scrollbar p-3 space-y-3 min-h-0">
       {messages.map((msg, index) => {
         let onRetry: (() => void) | undefined
         if (msg.role === 'error') {
@@ -254,12 +273,10 @@ export function MessageList() {
 
       {/* Loading bubble */}
       {isLoading && (
-        <div className="flex gap-3">
-          <div className="w-7 h-7 shrink-0">
-            <LogoIcon size={28} />
-          </div>
+        <div className="flex gap-2.5">
+          <div className="w-7 h-7 shrink-0"><LogoIcon size={28} /></div>
           <div className="px-3.5 py-2.5 rounded-2xl rounded-tl-sm
-                          bg-gray-100 dark:bg-gray-800">
+                          bg-white dark:bg-slate-800 border border-black/5 dark:border-white/5 shadow-sm">
             <LoadingDots />
           </div>
         </div>

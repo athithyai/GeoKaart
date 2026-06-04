@@ -16,21 +16,20 @@ export function MapTooltip({ x, y, statnaam, label, measureCode, period }: Props
       className="pointer-events-none absolute z-20 animate-fade-in"
       style={{ left: x + 12, top: y - 8, transform: 'translateY(-100%)' }}
     >
-      <div className="bg-white dark:bg-gray-900 rounded-xl shadow-xl border
-                      border-gray-200 dark:border-gray-700 px-3 py-2.5 min-w-[140px]">
-        <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 leading-tight">
+      <div className="glass rounded-xl shadow-2xl shadow-black/30 px-3.5 py-2.5 min-w-[150px]">
+        <p className="font-semibold text-sm text-slate-800 dark:text-slate-100 leading-tight">
           {statnaam}
         </p>
-        <div className="mt-1.5 flex items-baseline justify-between gap-3">
-          <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-[90px]">
-            {measureCode}
+        <div className="mt-1.5 flex items-baseline justify-between gap-4">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500 truncate max-w-[90px]">
+            {measureCode.replace(/_\d+$/, '')}
           </span>
-          <span className="text-sm font-bold text-brand-600 dark:text-brand-400 tabular-nums">
+          <span className="text-sm font-bold tabular-nums" style={{ color: '#00A1CD' }}>
             {label}
           </span>
         </div>
         {period && (
-          <p className="text-[10px] text-gray-400 dark:text-gray-600 mt-1">{period}</p>
+          <p className="text-[9px] text-slate-400 dark:text-slate-600 mt-1">{period}</p>
         )}
       </div>
     </div>

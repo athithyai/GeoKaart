@@ -4,61 +4,61 @@
 
 @layer base {
   body {
-    color: #091D23;
-    font-family: 'Akko Pro', system-ui, sans-serif;
+    color: #0f172a;
+    font-family: 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
   }
   .dark body {
-    color: #e9e9e9;
+    color: #f1f5f9;
   }
-}
-
-/* ── CBS Design System fonts ─────────────────────────────────────────────── */
-@font-face {
-  font-family: 'Akko Pro';
-  src: url('https://cdn.cbs.nl/cdn/fonts/akko-regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Soho Pro';
-  src: url('https://cdn.cbs.nl/cdn/fonts/soho-medium.woff2') format('woff2');
-  font-weight: 500;
-  font-style: normal;
-  font-display: swap;
 }
 
 /* ── MapLibre GL overrides ───────────────────────────────────────────────── */
 .maplibregl-map {
-  font-family: 'Akko Pro', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, sans-serif;
 }
 
 .maplibregl-ctrl-attrib {
   font-size: 10px;
-  opacity: 0.7;
+  opacity: 0.6;
+  background: rgba(255,255,255,0.7) !important;
+  backdrop-filter: blur(4px);
 }
 
 .maplibregl-ctrl-group {
-  @apply shadow-md border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden;
+  @apply shadow-lg rounded-xl overflow-hidden border-0 !important;
 }
 
 .maplibregl-ctrl button {
-  @apply bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200;
+  @apply bg-white/90 dark:bg-gray-800/90 text-gray-700 dark:text-gray-200;
+  backdrop-filter: blur(8px);
+  width: 32px !important;
+  height: 32px !important;
 }
 
 .maplibregl-ctrl button:hover {
-  @apply bg-gray-50 dark:bg-gray-700;
+  @apply bg-white dark:bg-gray-700;
+}
+
+.maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,
+.maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon,
+.maplibregl-ctrl-compass .maplibregl-ctrl-icon {
+  filter: invert(0);
+}
+
+.dark .maplibregl-ctrl-zoom-in .maplibregl-ctrl-icon,
+.dark .maplibregl-ctrl-zoom-out .maplibregl-ctrl-icon {
+  filter: invert(1);
 }
 
 /* ── Scrollbar styling ───────────────────────────────────────────────────── */
 .custom-scrollbar {
   scrollbar-width: thin;
-  scrollbar-color: theme('colors.gray.300') transparent;
+  scrollbar-color: rgba(148, 163, 184, 0.4) transparent;
 }
 
 .custom-scrollbar::-webkit-scrollbar {
-  width: 4px;
+  width: 3px;
 }
 
 .custom-scrollbar::-webkit-scrollbar-track {
@@ -66,28 +66,44 @@
 }
 
 .custom-scrollbar::-webkit-scrollbar-thumb {
-  @apply bg-gray-300 dark:bg-gray-600 rounded-full;
+  @apply bg-slate-300 dark:bg-slate-600 rounded-full;
+}
+
+/* ── Glassmorphism panel ─────────────────────────────────────────────────── */
+.glass {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(20px) saturate(1.8);
+  -webkit-backdrop-filter: blur(20px) saturate(1.8);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.88);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 /* ── Chat message animations ─────────────────────────────────────────────── */
 .message-enter {
-  animation: slideUp 0.25s ease-out;
+  animation: slideUp 0.2s ease-out;
 }
 
-/* ── Resize handle ───────────────────────────────────────────────────────── */
-.resize-handle {
-  cursor: col-resize;
-  transition: background-color 0.15s;
-}
-
-.resize-handle:hover,
-.resize-handle.dragging {
-  @apply bg-brand-400;
-}
-
-/* ── JSON syntax highlight (minimal) ────────────────────────────────────── */
+/* ── JSON syntax highlight ───────────────────────────────────────────────── */
 .json-key   { @apply text-blue-600 dark:text-blue-400; }
-.json-str   { @apply text-green-600 dark:text-green-400; }
-.json-num   { @apply text-orange-500 dark:text-orange-400; }
-.json-bool  { @apply text-purple-600 dark:text-purple-400; }
-.json-null  { @apply text-gray-400; }
+.json-str   { @apply text-emerald-600 dark:text-emerald-400; }
+.json-num   { @apply text-amber-600 dark:text-amber-400; }
+.json-bool  { @apply text-violet-600 dark:text-violet-400; }
+.json-null  { @apply text-slate-400; }
+
+/* ── Source badge ────────────────────────────────────────────────────────── */
+.source-badge {
+  @apply text-[9px] font-semibold px-1.5 py-0.5 rounded-full tracking-wide;
+  background: rgba(0, 161, 205, 0.12);
+  color: #0580A1;
+  border: 1px solid rgba(0, 161, 205, 0.2);
+}
+
+.dark .source-badge {
+  background: rgba(0, 161, 205, 0.15);
+  color: #40bfda;
+  border-color: rgba(0, 161, 205, 0.25);
+}

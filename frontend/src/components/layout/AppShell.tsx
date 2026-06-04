@@ -6,175 +6,147 @@ import { ThemeToggle } from './ThemeToggle'
 import { LogoWordmark } from '../LogoIcon'
 import { api } from '../../api/client'
 
-const MIN_CHAT_WIDTH = 300
-const MAX_CHAT_WIDTH = 640
-const DEFAULT_CHAT_WIDTH = 400
-
-// ── Ingest status helpers ─────────────────────────────────────────────────────
-
 type IngestStatus = 'idle' | 'running' | 'done' | 'error'
 
 function _fmtDate(iso: string | null | undefined): string {
   if (!iso) return '—'
   try {
     const d = new Date(iso.endsWith('Z') ? iso : iso + 'Z')
-    return d.toLocaleDateString('nl-NL', { day: 'numeric', month: 'short', year: 'numeric' })
-  } catch {
-    return iso.slice(0, 10)
-  }
+    return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+  } catch { return iso.slice(0, 10) }
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
-
 export function AppShell() {
-  const [chatWidth, setChatWidth] = useState(DEFAULT_CHAT_WIDTH)
-  const [dragging, setDragging] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-  // Ingest / refresh state
+  const [chatOpen,    setChatOpen]    = useState(true)
   const [ingestStatus, setIngestStatus] = useState<IngestStatus>('idle')
   const [ingestLastRun, setIngestLastRun] = useState<string | null>(null)
-  const [ingestProgress, setIngestProgress] = useState<string>('')
+  const [ingestProgress, setIngestProgress] = useState('')
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  // Fetch initial status on mount
   useEffect(() => {
     api.adminStatus().then(s => {
-      const lastRun = s.db_log?.finished_at ?? s.finished_at
-      setIngestLastRun(lastRun ?? null)
+      setIngestLastRun(s.db_log?.finished_at ?? s.finished_at ?? null)
       setIngestStatus(s.status as IngestStatus)
-    }).catch(() => {/* silently ignore */})
+    }).catch(() => {})
   }, [])
 
-  // Poll while running
   useEffect(() => {
-    if (ingestStatus === 'running') {
-      pollRef.current = setInterval(async () => {
-        try {
-          const s = await api.adminStatus()
-          setIngestProgress(s.progress ?? '')
-          if (s.status !== 'running') {
-            setIngestStatus(s.status as IngestStatus)
-            const lastRun = s.db_log?.finished_at ?? s.finished_at
-            setIngestLastRun(lastRun ?? null)
-            if (pollRef.current) clearInterval(pollRef.current)
-          }
-        } catch { /* ignore */ }
-      }, 3000)
-    }
+    if (ingestStatus !== 'running') return
+    pollRef.current = setInterval(async () => {
+      try {
+        const s = await api.adminStatus()
+        setIngestProgress(s.progress ?? '')
+        if (s.status !== 'running') {
+          setIngestStatus(s.status as IngestStatus)
+          setIngestLastRun(s.db_log?.finished_at ?? s.finished_at ?? null)
+          if (pollRef.current) clearInterval(pollRef.current)
+        }
+      } catch {}
+    }, 3000)
     return () => { if (pollRef.current) clearInterval(pollRef.current) }
   }, [ingestStatus])
 
   const handleRefresh = useCallback(async () => {
     if (ingestStatus === 'running') return
-    try {
-      await api.adminIngest()
-      setIngestStatus('running')
-      setIngestProgress('Starting …')
-    } catch { /* ignore */ }
+    try { await api.adminIngest(); setIngestStatus('running'); setIngestProgress('Starting…') }
+    catch {}
   }, [ingestStatus])
 
-  const startDrag = useCallback((e: React.MouseEvent) => {
-    e.preventDefault()
-    setDragging(true)
-
-    const startX = e.clientX
-    const startW = chatWidth
-
-    const onMove = (ev: MouseEvent) => {
-      const delta = ev.clientX - startX
-      const next = Math.max(MIN_CHAT_WIDTH, Math.min(MAX_CHAT_WIDTH, startW + delta))
-      setChatWidth(next)
-    }
-
-    const onUp = () => {
-      setDragging(false)
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }, [chatWidth])
-
   return (
-    <div className="h-screen w-screen flex flex-col bg-gray-50 dark:bg-gray-950 overflow-hidden">
-      {/* Header */}
-      <header className="flex items-center justify-between px-4 h-12 bg-white dark:bg-gray-900
-                         border-b border-cbs-border dark:border-gray-800 shrink-0 z-10 shadow-sm">
+    <div className="relative w-screen h-screen overflow-hidden bg-slate-900">
+
+      {/* ── Full-screen map ─────────────────────────────────────────────────── */}
+      <div className="absolute inset-0">
+        <MapPanel />
+      </div>
+
+      {/* ── Topbar ──────────────────────────────────────────────────────────── */}
+      <header className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between
+                         px-4 h-11 glass shadow-sm">
         <div className="flex items-center gap-3">
-          <LogoWordmark iconSize={28} />
-          <span className="text-xs hidden sm:block" style={{ color: '#878787' }}>
-            Dutch Geospatial Intelligence
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          {/* Spatial data refresh — small hidden chip, visible on hover */}
-          <div className="group relative hidden sm:flex items-center">
-            <button
-              onClick={handleRefresh}
-              disabled={ingestStatus === 'running'}
-              title={
-                ingestStatus === 'running'
-                  ? `Refreshing… ${ingestProgress}`
-                  : `Refresh spatial data${ingestLastRun ? ` · updated ${_fmtDate(ingestLastRun)}` : ''}`
+          {/* Chat toggle button */}
+          <button
+            onClick={() => setChatOpen(v => !v)}
+            className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg
+                       text-slate-600 dark:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10
+                       transition-colors"
+            title={chatOpen ? 'Hide chat' : 'Open chat'}
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              {chatOpen
+                ? <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
+                : <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               }
-              className={[
-                'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
-                'border transition-all duration-200',
-                ingestStatus === 'running'
-                  ? 'border-amber-300 text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-950 cursor-wait'
-                  : ingestStatus === 'error'
-                  ? 'border-red-300 text-red-500 hover:bg-red-50 dark:hover:bg-red-950'
-                  : 'border-gray-200 dark:border-gray-700 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-500',
-              ].join(' ')}
-            >
-              <span
-                className={ingestStatus === 'running' ? 'animate-spin inline-block' : ''}
-                style={{ display: 'inline-block' }}
-              >↻</span>
-              <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-150 max-w-0 group-hover:max-w-[160px] overflow-hidden whitespace-nowrap">
-                {ingestStatus === 'running'
-                  ? (ingestProgress || 'Refreshing…')
-                  : ingestLastRun
-                  ? `updated ${_fmtDate(ingestLastRun)}`
-                  : 'refresh data'}
-              </span>
-            </button>
+            </svg>
+          </button>
+
+          <div className="h-4 w-px bg-slate-200 dark:bg-slate-700" />
+          <LogoWordmark iconSize={22} />
+        </div>
+
+        <div className="flex items-center gap-2">
+          {/* Source badges */}
+          <div className="hidden sm:flex items-center gap-1">
+            {['CBS', 'PDOK', 'ORS'].map(s => (
+              <span key={s} className="source-badge">{s}</span>
+            ))}
           </div>
 
-          <span className="text-xs mr-1 hidden sm:block" style={{ color: '#878787' }}>
-            CBS · PDOK · RWS · RIVM
-          </span>
+          {/* Data refresh */}
+          <button
+            onClick={handleRefresh}
+            disabled={ingestStatus === 'running'}
+            title={ingestStatus === 'running'
+              ? `Refreshing… ${ingestProgress}`
+              : `Refresh data${ingestLastRun ? ` · ${_fmtDate(ingestLastRun)}` : ''}`}
+            className={[
+              'flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium transition-all',
+              ingestStatus === 'running'
+                ? 'text-amber-500 dark:text-amber-400 cursor-wait'
+                : 'text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-black/5 dark:hover:bg-white/10',
+            ].join(' ')}
+          >
+            <span className={ingestStatus === 'running' ? 'animate-spin inline-block' : ''}>↻</span>
+          </button>
+
           <ThemeToggle />
         </div>
       </header>
 
-      {/* Main content */}
-      <div ref={containerRef} className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Chat panel */}
-        <div
-          style={{ width: chatWidth }}
-          className="flex flex-col shrink-0 min-h-0 bg-white dark:bg-gray-900
-                     border-r border-gray-200 dark:border-gray-800"
-        >
-          <ChatPanel />
-        </div>
-
-        {/* Resize handle */}
-        <div
-          onMouseDown={startDrag}
-          className={`resize-handle w-1 shrink-0 bg-gray-200 dark:bg-gray-800
-                      ${dragging ? 'dragging' : ''}`}
-        />
-
-        {/* Map panel */}
-        <div className="flex-1 min-w-0 relative">
-          <MapPanel />
-        </div>
+      {/* ── Floating chat panel ──────────────────────────────────────────────── */}
+      <div
+        className={[
+          'absolute top-14 left-4 bottom-4 z-10',
+          'w-[380px] flex flex-col',
+          'glass rounded-2xl shadow-2xl shadow-black/20',
+          'transition-all duration-300 ease-in-out',
+          chatOpen ? 'opacity-100 translate-x-0' : 'opacity-0 -translate-x-8 pointer-events-none',
+        ].join(' ')}
+      >
+        <ChatPanel />
       </div>
 
-      {/* Data table — full-width bottom strip, spans chat + map */}
-      <DataTable />
+      {/* ── Chat open FAB (when chat is hidden) ───────────────────────────────── */}
+      {!chatOpen && (
+        <button
+          onClick={() => setChatOpen(true)}
+          className="absolute top-14 left-4 z-10 w-12 h-12 rounded-2xl
+                     glass shadow-xl shadow-black/20 flex items-center justify-center
+                     text-brand-500 hover:text-brand-600 transition-colors
+                     animate-[fadeIn_0.2s_ease-out]"
+          title="Open chat"
+        >
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+              d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          </svg>
+        </button>
+      )}
+
+      {/* ── Data table — floating bottom strip ───────────────────────────────── */}
+      <div className="absolute bottom-0 left-0 right-0 z-10">
+        <DataTable />
+      </div>
     </div>
   )
 }
